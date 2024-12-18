@@ -1,4 +1,2 @@
-## Installation
-Clone the repository and install the required dependencies:
-```bash
-pip install -r requirements.txt
+# viz-neutronics
+My Python module to help visualise neutronics outputs
