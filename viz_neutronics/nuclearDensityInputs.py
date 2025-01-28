@@ -99,7 +99,7 @@ Cr = {'Mr': 52,'wtPerc': wtPercCr}
 waterDensity = 0.7
 O = { "Mr": 16, "atPerc": 1}
 H = {"Mr": 1, "atPerc": 2}
-# input = {'O': O, 'H': H, 'density' : waterDensity, 'wtPerc': 1, 'atPerc': 1}
+H2O = {'O': O, 'H': H, 'density' : waterDensity, 'wtPerc': 1, 'atPerc': 1}
 
 
 ## steel for RPV ### ASME A508 Grade 3   https://cdn.standards.iteh.ai/samples/28504/748d0804e90c4bc9ace68144efbd9b03/ASTM-A508-A508M-03.pdf
