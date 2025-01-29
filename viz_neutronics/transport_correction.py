@@ -17,7 +17,7 @@ def generate_mg_XS(filepath_MC_output : str, tcType : str):
     tcType (str) : Transport correction type. Can be either 'flux limited' or 'outscatter'
 
     """
-    print('Applying transport correction to multigroup cross sections')
+    print('Applying' + tcType + 'transport correction to multigroup cross sections')
     # read in MC output file (json)
     with open(filepath_MC_output) as f:
         outputDict = json.load(f)
