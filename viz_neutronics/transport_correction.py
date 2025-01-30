@@ -4,8 +4,9 @@
 
 import os
 import json
-from viz_neutronics.input2json import dict2obj
-# from input2json import dict2obj
+from decimal import Decimal as dc
+# from viz_neutronics.input2json import dict2obj
+from input2json import dict2obj # when running test within this script
 import numpy as np
 
 
@@ -17,7 +18,7 @@ def generate_mg_XS(filepath_MC_output : str, tcType : str):
     tcType (str) : Transport correction type. Can be either 'flux limited' or 'outscatter'
 
     """
-    print('Applying' + tcType + 'transport correction to multigroup cross sections')
+    print('Applying ' + tcType + ' transport correction to multigroup cross sections')
     # read in MC output file (json)
     with open(filepath_MC_output) as f:
         outputDict = json.load(f)
@@ -43,10 +44,10 @@ def generate_mg_XS(filepath_MC_output : str, tcType : str):
         MaterialBins = ['material'] # for a single material
         numGroups = len(EnergyBounds[0])
         numMat = 1
+    print('{:.0f} energy groups,{:.0f} material (s)'.format(numGroups, numMat))
 
-    print('capture', np.array(sm.capture))
+
     capture = np.array(sm.capture)[...,0]
-    print('capture', capture)
     fission = np.array(sm.fission)[...,0]
     transportFluxLimited = np.array(sm.transportFluxLimited)[...,0]
     transportOutScatter = np.array(sm.transportOutScatter)[...,0]
@@ -54,6 +55,9 @@ def generate_mg_XS(filepath_MC_output : str, tcType : str):
     chi = np.array(sm.chi)[...,0]
     P0 = np.array(sm.P0)[...,0]
     prod = np.array(sm.prod)[...,0]
+
+    print('Capture XS')
+    print(capture)
 
     if hasattr(sm, 'P1'):
         P1 = np.array(sm.P1)
@@ -93,17 +97,18 @@ def generate_mg_XS(filepath_MC_output : str, tcType : str):
 
         prod_corrected[..., g,g] = (prod[..., g,g] - 1) * P0[..., g,g] / P0_corrected[..., g,g] + 1
 
+    print('P0 corrected')
+    print(P0_corrected)
+
     # writes an output file for each material name material1, material2 etc.
 
     newpath = 'materialsInputs'
     if not os.path.exists(newpath):
         os.makedirs(newpath)
-    print('numMat', numMat)
-    print(capture)
+
 
     for matIndex in range(numMat):
         if numMat == 1:
-            print('One material')
             
             mat = MaterialBins[matIndex]
             f = open(newpath + '/' + mat, "w")
@@ -136,4 +141,4 @@ def generate_mg_XS(filepath_MC_output : str, tcType : str):
 
 
 # test
-# generate_mg_XS("SimplePin_MC_material_output.json", tcType = 'flux limited')
+generate_mg_XS("SimplePin_MC_material_output.json", tcType = 'flux limited')
