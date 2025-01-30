@@ -115,6 +115,7 @@ def generate_mg_XS(filepath_MC_output : str, tcType : str):
 
             f.write('\nnumberOfGroups '+ str(numGroups) + ';')
             f.write('\ncapture    (' + str(capture).replace('[','').replace(']','') + ');')
+            
             f.write('\nfission   (' + str(fission).replace('[','').replace(']','') + ');')
             f.write('\nnu ('+ str(nu).replace('[','').replace(']','') + ');')
             f.write('\nchi ('+ str(chi).replace('[','').replace(']','') + ');')
@@ -129,9 +130,13 @@ def generate_mg_XS(filepath_MC_output : str, tcType : str):
             
             f.write('\nnumberOfGroups '+ str(numGroups) + ';')
             f.write('\ncapture    (' + str(capture[matIndex]).replace('[','').replace(']','') + ');')
-            f.write('\nfission   (' + str(fission[matIndex]).replace('[','').replace(']','') + ');')
-            f.write('\nnu ('+ str(nu[matIndex]).replace('[','').replace(']','') + ');')
-            f.write('\nchi ('+ str(chi[matIndex]).replace('[','').replace(']','') + ');')
+            if np.any(fission[matIndex]) == False:
+                print('No fission cross section for {}'.format(mat))
+                
+            else:
+                f.write('\nfission   (' + str(fission[matIndex]).replace('[','').replace(']','') + ');')
+                f.write('\nnu ('+ str(nu[matIndex]).replace('[','').replace(']','') + ');')
+                f.write('\nchi ('+ str(chi[matIndex]).replace('[','').replace(']','') + ');')
             f.write('\nscatteringMultiplicity ('+ str(prod[matIndex].flatten()).replace('[','').replace(']','') + ');')
             f.write('\nP0 ('+ str(P0_corrected[matIndex].flatten()).replace('[','').replace(']','') + ');')
             f.write('\n' +r'//') # for some reason the file won't run unless these comment signs are at the bottom
