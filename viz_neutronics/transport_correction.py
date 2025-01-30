@@ -5,8 +5,8 @@
 import os
 import json
 from decimal import Decimal as dc
-# from viz_neutronics.input2json import dict2obj
-from input2json import dict2obj # when running test within this script
+from viz_neutronics.input2json import dict2obj
+# from input2json import dict2obj # when running test within this script
 import numpy as np
 
 
@@ -160,4 +160,4 @@ def generate_mg_XS(filepath_MC_output : str, tcType : str, switch='ON'):
 
 
 # test
-generate_mg_XS("SimplePin_MC_material_output.json", tcType = 'flux limited', switch='OFF')
+# generate_mg_XS("SimplePin_MC_material_output.json", tcType = 'flux limited', switch='OFF')
