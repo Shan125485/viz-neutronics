@@ -5,18 +5,18 @@
 import os
 import json
 from decimal import Decimal as dc
-from viz_neutronics.input2json import dict2obj
-# from input2json import dict2obj # when running test within this script
+# from viz_neutronics.input2json import dict2obj
+from input2json import dict2obj # when running test within this script
 import numpy as np
 
 
 
-def generate_mg_XS(filepath_MC_output : str, tcType : str):
+def generate_mg_XS(filepath_MC_output : str, tcType : str, switch='ON'):
     """
     Summary: This script works for Material Maps. If there is no material map...
     filepath_MC_output (str) : The filepath to the Monte Carlo output file containing multigroup cross sections
     tcType (str) : Transport correction type. Can be either 'flux limited' or 'outscatter'
-
+    switch (str) : 'ON' or 'OFF' If off, no correction is applied
     """
     print('Applying ' + tcType + ' transport correction to multigroup cross sections')
     # read in MC output file (json)
@@ -79,26 +79,40 @@ def generate_mg_XS(filepath_MC_output : str, tcType : str):
     scatter = np.sum(P0,-1) # sum along each row of the scattering matrix to get the total scatter cross section
     total = fission + capture + scatter
 
-    # calculate transport correction
-    correction_FluxLimited = total - transportFluxLimited
-    correction_OutScatter = total - transportOutScatter
 
-    # apply transport correction
-    P0_corrected = P0
-    prod_corrected = prod
-    for g in range(numGroups):
+    if switch == 'ON':
+
+        # calculate transport correction
+        correction_FluxLimited = total - transportFluxLimited
+        correction_OutScatter = total - transportOutScatter
+
+        
+
+        # apply transport correction
+        P0_corrected = P0
+        prod_corrected = prod
+        for g in range(numGroups):
+        
+            if tcType == 'outscatter':
+                P0_corrected[..., g,g] = P0[..., g,g] - correction_OutScatter[..., g]
+            elif tcType == 'flux limited':
+                P0_corrected[..., g,g] = P0[..., g,g] - correction_FluxLimited[..., g]
+            else:
+                raise ValueError('No correction to scattering cross section was applied')
+
+            prod_corrected[..., g,g] = (prod[..., g,g] - 1) * P0[..., g,g] / P0_corrected[..., g,g] + 1
+
+        print('P0 corrected')
+        print(P0_corrected)
     
-        if tcType == 'outscatter':
-            P0_corrected[..., g,g] = P0[..., g,g] - correction_OutScatter[..., g]
-        elif tcType == 'flux limited':
-            P0_corrected[..., g,g] = P0[..., g,g] - correction_FluxLimited[..., g]
-        else:
-            raise ValueError('No correction to scattering cross section was applied')
+    elif switch == 'OFF':
+        print('WARNING: No transport correction applied. Argument switch is OFF')
+        # no change
+        P0_corrected = P0
+        prod_corrected = prod
+        print('P0')
+        print(P0_corrected)
 
-        prod_corrected[..., g,g] = (prod[..., g,g] - 1) * P0[..., g,g] / P0_corrected[..., g,g] + 1
-
-    print('P0 corrected')
-    print(P0_corrected)
 
     # writes an output file for each material name material1, material2 etc.
 
@@ -146,4 +160,4 @@ def generate_mg_XS(filepath_MC_output : str, tcType : str):
 
 
 # test
-# generate_mg_XS("SimplePin_MC_material_output.json", tcType = 'flux limited')
+generate_mg_XS("SimplePin_MC_material_output.json", tcType = 'flux limited', switch='OFF')
