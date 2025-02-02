@@ -11,12 +11,12 @@ import numpy as np
 
 
 
-def generate_mg_XS(filepath_MC_output : str, tcType : str, switch='ON'):
+def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2string, switch='ON'):
     """
     Summary: This script works for Material Maps. If there is no material map...
-    filepath_MC_output (str) : The filepath to the Monte Carlo output file containing multigroup cross sections
-    tcType (str) : Transport correction type. Can be either 'flux limited' or 'outscatter'
-    switch (str) : 'ON' or 'OFF' If off, no correction is applied
+    filepath_MC_output (np.array2string) : The filepath to the Monte Carlo output file containing multigroup cross sections
+    tcType (np.array2string) : Transport correction type. Can be either 'flux limited' or 'outscatter'
+    switch (np.array2string) : 'ON' or 'OFF' If off, no correction is applied
     """
     print('Applying ' + tcType + ' transport correction to multigroup cross sections')
     # read in MC output file (json)
@@ -128,13 +128,13 @@ def generate_mg_XS(filepath_MC_output : str, tcType : str, switch='ON'):
             f = open(newpath + '/' + mat, "w")
 
             f.write('\nnumberOfGroups '+ str(numGroups) + ';')
-            f.write('\ncapture    (' + str(capture).replace('[','').replace(']','') + ');')
+            f.write('\ncapture    (' + np.array2string(capture, threshold=np.inf).replace('[','').replace(']','') + ');')
             
-            f.write('\nfission   (' + str(fission).replace('[','').replace(']','') + ');')
-            f.write('\nnu ('+ str(nu).replace('[','').replace(']','') + ');')
-            f.write('\nchi ('+ str(chi).replace('[','').replace(']','') + ');')
-            f.write('\nscatteringMultiplicity ('+ str(prod.flatten()).replace('[','').replace(']','') + ');')
-            f.write('\nP0 ('+ str(P0_corrected.flatten()).replace('[','').replace(']','') + ');')
+            f.write('\nfission   (' + np.array2string(fission, threshold=np.inf).replace('[','').replace(']','') + ');')
+            f.write('\nnu ('+ np.array2string(nu, threshold=np.inf).replace('[','').replace(']','') + ');')
+            f.write('\nchi ('+ np.array2string(chi, threshold=np.inf).replace('[','').replace(']','') + ');')
+            f.write('\nscatteringMultiplicity ('+ np.array2string(prod.flatten(), threshold=np.inf).replace('[','').replace(']','') + ');')
+            f.write('\nP0 ('+ np.array2string(P0_corrected.flatten(), threshold=np.inf).replace('[','').replace(']','') + ');')
             f.write('\n' +r'//') # for some reason the file won't run unless these comment signs are at the bottom
         
         elif numMat > 1:
@@ -143,16 +143,16 @@ def generate_mg_XS(filepath_MC_output : str, tcType : str, switch='ON'):
             f = open(newpath + '/' + mat, "w")
             
             f.write('\nnumberOfGroups '+ str(numGroups) + ';')
-            f.write('\ncapture    (' + str(capture[matIndex]).replace('[','').replace(']','') + ');')
+            f.write('\ncapture    (' + np.array2string(capture[matIndex], threshold=np.inf).replace('[','').replace(']','') + ');')
             if np.any(fission[matIndex]) == False:
                 print('No fission cross section for {}'.format(mat))
                 
             else:
-                f.write('\nfission   (' + str(fission[matIndex]).replace('[','').replace(']','') + ');')
-                f.write('\nnu ('+ str(nu[matIndex]).replace('[','').replace(']','') + ');')
-                f.write('\nchi ('+ str(chi[matIndex]).replace('[','').replace(']','') + ');')
-            f.write('\nscatteringMultiplicity ('+ str(prod[matIndex].flatten()).replace('[','').replace(']','') + ');')
-            f.write('\nP0 ('+ str(P0_corrected[matIndex].flatten()).replace('[','').replace(']','') + ');')
+                f.write('\nfission   (' + np.array2string(fission[matIndex], threshold=np.inf).replace('[','').replace(']','') + ');')
+                f.write('\nnu ('+ np.array2string(nu[matIndex], threshold=np.inf).replace('[','').replace(']','') + ');')
+                f.write('\nchi ('+ np.array2string(chi[matIndex], threshold=np.inf).replace('[','').replace(']','') + ');')
+            f.write('\nscatteringMultiplicity ('+ np.array2string(prod[matIndex].flatten(), threshold=np.inf).replace('[','').replace(']','') + ');')
+            f.write('\nP0 ('+ np.array2string(P0_corrected[matIndex].flatten(), threshold=np.inf ).replace('[','').replace(']','') + ');')
             f.write('\n' +r'//') # for some reason the file won't run unless these comment signs are at the bottom
 
 
@@ -161,3 +161,4 @@ def generate_mg_XS(filepath_MC_output : str, tcType : str, switch='ON'):
 
 # test
 # generate_mg_XS("SimplePin_MC_material_output.json", tcType = 'flux limited', switch='OFF')
+# generate_mg_XS("SimplePin_MC_output_64G.json", tcType = 'flux limited', switch='OFF')
