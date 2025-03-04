@@ -89,10 +89,9 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
         
 
         # apply transport correction
-        P0_corrected = P0
-        prod_corrected = prod
+        P0_corrected = np.copy(P0)
+        prod_corrected = np.copy(prod)
         for g in range(numGroups):
-        
             if tcType == 'outscatter':
                 P0_corrected[..., g,g] = P0[..., g,g] - correction_OutScatter[..., g]
             elif tcType == 'flux limited':
@@ -102,14 +101,15 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
 
             prod_corrected[..., g,g] = (prod[..., g,g] - 1) * P0[..., g,g] / P0_corrected[..., g,g] + 1
 
+        
         print('P0 corrected')
         print(P0_corrected)
     
     elif switch == 'OFF':
         print('WARNING: No transport correction applied. Argument switch is OFF')
         # no change
-        P0_corrected = P0
-        prod_corrected = prod
+        P0_corrected = np.copy(P0)
+        prod_corrected = np.copy(prod)
         print('P0')
         print(P0_corrected)
 
@@ -133,7 +133,7 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
             f.write('\nfission   (' + np.array2string(fission, threshold=np.inf).replace('[','').replace(']','') + ');')
             f.write('\nnu ('+ np.array2string(nu, threshold=np.inf).replace('[','').replace(']','') + ');')
             f.write('\nchi ('+ np.array2string(chi, threshold=np.inf).replace('[','').replace(']','') + ');')
-            f.write('\nscatteringMultiplicity ('+ np.array2string(prod.flatten(), threshold=np.inf).replace('[','').replace(']','') + ');')
+            f.write('\nscatteringMultiplicity ('+ np.array2string(prod_corrected.flatten(), threshold=np.inf).replace('[','').replace(']','') + ');')
             f.write('\nP0 ('+ np.array2string(P0_corrected.flatten(), threshold=np.inf).replace('[','').replace(']','') + ');')
             f.write('\n' +r'//') # for some reason the file won't run unless these comment signs are at the bottom
         
@@ -151,7 +151,7 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
                 f.write('\nfission   (' + np.array2string(fission[matIndex], threshold=np.inf).replace('[','').replace(']','') + ');')
                 f.write('\nnu ('+ np.array2string(nu[matIndex], threshold=np.inf).replace('[','').replace(']','') + ');')
                 f.write('\nchi ('+ np.array2string(chi[matIndex], threshold=np.inf).replace('[','').replace(']','') + ');')
-            f.write('\nscatteringMultiplicity ('+ np.array2string(prod[matIndex].flatten(), threshold=np.inf).replace('[','').replace(']','') + ');')
+            f.write('\nscatteringMultiplicity ('+ np.array2string(prod_corrected[matIndex].flatten(), threshold=np.inf).replace('[','').replace(']','') + ');')
             f.write('\nP0 ('+ np.array2string(P0_corrected[matIndex].flatten(), threshold=np.inf ).replace('[','').replace(']','') + ');')
             f.write('\n' +r'//') # for some reason the file won't run unless these comment signs are at the bottom
 
@@ -162,3 +162,4 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
 # test
 # generate_mg_XS("SimplePin_MC_material_output.json", tcType = 'flux limited', switch='OFF')
 # generate_mg_XS("SimplePin_MC_output_64G.json", tcType = 'flux limited', switch='OFF')
+# generate_mg_XS("SimpleSlab_MC_output_1G.json", tcType = 'flux limited', switch='ON')
