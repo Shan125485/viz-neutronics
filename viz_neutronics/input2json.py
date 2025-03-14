@@ -92,22 +92,6 @@ def dict2obj(dict1):
     # method and custom object hook as arguments
     return json.loads(json.dumps(dict1), object_hook=obj)
 
-def mat2json(dotmatfile):
-   
-    with open(dotmatfile, "r") as f:
-        content = f.read()
-
-    # Extract numbers (assuming simple assignments like x = [1, 2, 3];)
-    matches = re.findall(r"(\w+)\s*=\s*\[([\d,\s]+)\];", content)
-
-    # Convert to a dictionary
-    data_dict = {var: list(map(int, vals.split(','))) for var, vals in matches}
-
-    # Save as JSON
-    with open("data.json", "w") as f:
-        json.dump(data_dict, f, indent=4)
-
-    print("Converted to JSON:", data_dict)
 
 
 # Example usage
