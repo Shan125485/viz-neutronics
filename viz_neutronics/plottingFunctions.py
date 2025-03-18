@@ -90,38 +90,39 @@ def plotScatteringMatrices(outputFile):
 
     plot.savefig('P0_colourmap')
 
-def plotFissionRatesMC(outputFile):
-    outputs = readOutputs(outputFile)
-    reactionRate = np.array(outputs.active.pinFiss.Res)
-    flux = reactionRate[:,:,0,0]
-    flux_std = reactionRate[:,:,0,1]
-    fissRate = reactionRate[:,:,1,0]
-    fissRate_std = reactionRate[:,:,1,1]
-    X = np.array(outputs.active.pinFiss.XBounds)
-    Y = np.array(outputs.active.pinFiss.XBounds)
+def plotFissionRatesMC(outputFile, normalise_plot=False, target=100):
+    fissRate, fissRate_std = findFissRateMC(outputFile)
+
+    # flux = reactionRate[:,:,0,0]
+    # flux_std = reactionRate[:,:,0,1]
+    # fissRate = reactionRate[:,:,1,0]
+    # fissRate_std = reactionRate[:,:,1,1]
+    # X = np.array(outputs.active.pinFiss.XBounds)
+    # Y = np.array(outputs.active.pinFiss.XBounds)
 
     # Average coordinates to point to the centre of cell rather than bounbdaries
-    X =  (X[:0] + X[:1]) / 2
-    Y =  (Y[:0] + Y[:1]) / 2
+    # X =  (X[:0] + X[:1]) / 2
+    # Y =  (Y[:0] + Y[:1]) / 2
 
     fig, ax1 = plot.subplots()
+    if normalise_plot == True:
+        # fissRate = fissRate / np.max(fissRate)
+        fissRate = normalise(fissRate, target)
+        
     val = ax1.imshow(fissRate)
     fig.colorbar(val, ax=ax1)
     fig.suptitle('Monte Carlo fission rate')
     plot.savefig('Fission_rate_MC')
 
-def plotFissionRatesRR(outputFile):
-    outputs = readOutputs(outputFile)
+def plotFissionRatesRR(outputFile, normalise_plot=False, target=100):
+    # outputs = readOutputs(outputFile)
+    
+    fissRate, fissRate_std = findFissRateRR(outputFile)
 
-    
-    
-    fissRate = np.array(outputs.fiss1G.fiss1G)[...,0]
-    print(fissRate.shape)
-    fissRate_std = np.array(outputs.fiss1G.fiss1G)[...,1]
-    X_fiss = (np.array(outputs.fiss1G.XBounds)[...,0] + np.array(outputs.fiss1G.XBounds)[...,1])/2
-    Y_fiss = (np.array(outputs.fiss1G.YBounds)[...,0] + np.array(outputs.fiss1G.YBounds)[...,1])/2
-    flux = np.array(outputs.flux1G.flux1G)[...,0]
-    flux_std = np.array(outputs.flux1G.flux1G)[...,1]
+    # X_fiss = (np.array(outputs.fiss1G.XBounds)[...,0] + np.array(outputs.fiss1G.XBounds)[...,1])/2
+    # Y_fiss = (np.array(outputs.fiss1G.YBounds)[...,0] + np.array(outputs.fiss1G.YBounds)[...,1])/2
+    # flux = np.array(outputs.flux1G.flux1G)[...,0]
+    # flux_std = np.array(outputs.flux1G.flux1G)[...,1]
 
 
 
@@ -134,6 +135,11 @@ def plotFissionRatesRR(outputFile):
     # Y =  (Y[:0] + Y[:1]) / 2
 
     fig, ax1 = plot.subplots()
+
+    if normalise == True:
+        # fissRate = fissRate / np.max(fissRate)
+        fissRate = normalise(fissRate, target)
+        
     val = ax1.imshow(fissRate)
     fig.colorbar(val, ax=ax1)
 
@@ -141,3 +147,58 @@ def plotFissionRatesRR(outputFile):
     plot.savefig('Fission_rate_RR')
 
     
+def plotFissionRatesCompareMC_RR(outputFileMC,outputFileRR, target=100):
+
+    fissRateMC = normalise(findFissRateMC(outputFileMC)[0], target)
+    fissRateRR = normalise(findFissRateRR(outputFileRR)[0], target)
+    
+    # Calculate quantities
+    rel_diff = (fissRateRR - fissRateMC) / fissRateMC
+    rmse = rmsError(fissRateMC, fissRateRR, target)
+    max_error = np.max(np.abs(rel_diff))
+
+    # plot relative difference
+    fig, ax1 = plot.subplots()
+            
+    val = ax1.imshow(rel_diff)
+    cb = fig.colorbar(val, ax=ax1, format='{x:.2f}')
+    cb.set_label('Relative difference')
+
+    fig.suptitle('(RR -MC) / MC: relative difference in fission rate.\nMax error={:.1%}, RMSE={:.2%} relative to max MC fission rate'.format(max_error, rmse))
+    plot.savefig('Fission_rate_rel_diff')
+    return rel_diff
+
+def findFissRateRR(outputFileRR):
+    outputs = readOutputs(outputFileRR)
+    fissRate = np.array(outputs.fiss1G.fiss1G)[...,0]
+    fissRate_std = np.array(outputs.fiss1G.fiss1G)[...,1]
+    return fissRate, fissRate_std
+
+
+def findFissRateMC(outputFileMC):
+    outputs = readOutputs(outputFileMC)
+    reactionRate = np.array(outputs.active.pinFiss.Res)
+    fissRate = reactionRate[:,:,1,0]
+    fissRate_std = reactionRate[:,:,1,1]
+    return fissRate, fissRate_std
+
+def normalise(array, target):
+    # array_norm = array / np.max(array)
+
+    alpha = target / np.copy(np.sum(array))
+    array_norm = np.copy(array) * alpha
+
+    return array_norm
+
+def rmsError(actual_result, predicted_result, target = 100):
+    # normalise both results
+    # actual_result = normalise(actual_result, target)
+    # predicted_result = normalise(predicted_result, target)
+
+    # Calculate the mean squared error (MSE) by taking the mean of the squared differences
+    meanSquaredError = ((predicted_result - actual_result) ** 2).mean()
+
+    # Calculate the RMSE by taking the square root of the MSE
+    rmse = np.sqrt(meanSquaredError) / np.max(actual_result)
+    return rmse
+

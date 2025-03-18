@@ -5,13 +5,14 @@
 import os
 import json
 from decimal import Decimal as dc
-from viz_neutronics.input2json import dict2obj
-# from input2json import dict2obj # when running test within this script
+import matplotlib.pyplot as plot
+# from viz_neutronics.input2json import dict2obj
+from input2json import dict2obj # when running test within this script
 import numpy as np
 
 
 
-def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2string, switch='ON'):
+def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2string, switch='ON', plotting=False):
     """
     Summary: This script works for Material Maps. If there is no material map...
     filepath_MC_output (np.array2string) : The filepath to the Monte Carlo output file containing multigroup cross sections
@@ -86,8 +87,6 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
         correction_FluxLimited = total - transportFluxLimited
         correction_OutScatter = total - transportOutScatter
 
-        
-
         # apply transport correction
         P0_corrected = np.copy(P0)
         prod_corrected = np.copy(prod)
@@ -120,46 +119,76 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
     if not os.path.exists(newpath):
         os.makedirs(newpath)
 
-
     for matIndex in range(numMat):
         if numMat == 1:
-            
             mat = MaterialBins[matIndex]
-            f = open(newpath + '/' + mat, "w")
+            capture_res = np.copy(capture)
+            fission_res = np.copy(fission)
+            nu_res = np.copy(nu)
+            chi_res = np.copy(chi)
+            prod_corrected_res = np.copy(prod_corrected)
+            P0_corrected_res = np.copy( P0_corrected)
 
-            f.write('\nnumberOfGroups '+ str(numGroups) + ';')
-            f.write('\ncapture    (' + np.array2string(capture, threshold=np.inf).replace('[','').replace(']','') + ');')
-            
-            f.write('\nfission   (' + np.array2string(fission, threshold=np.inf).replace('[','').replace(']','') + ');')
-            f.write('\nnu ('+ np.array2string(nu, threshold=np.inf).replace('[','').replace(']','') + ');')
-            f.write('\nchi ('+ np.array2string(chi, threshold=np.inf).replace('[','').replace(']','') + ');')
-            f.write('\nscatteringMultiplicity ('+ np.array2string(prod_corrected.flatten(), threshold=np.inf).replace('[','').replace(']','') + ');')
-            f.write('\nP0 ('+ np.array2string(P0_corrected.flatten(), threshold=np.inf).replace('[','').replace(']','') + ');')
-            f.write('\n' +r'//') # for some reason the file won't run unless these comment signs are at the bottom
-        
         elif numMat > 1:
+           
             [mat] = MaterialBins[matIndex] 
+            capture_res = np.copy(capture[matIndex])
+            fission_res = np.copy(fission[matIndex])
+            nu_res = np.copy(nu[matIndex])
+            chi_res = np.copy(chi[matIndex])
+            prod_corrected_res = np.copy(prod_corrected[matIndex])
+            P0_corrected_res = np.copy( P0_corrected[matIndex])
 
-            f = open(newpath + '/' + mat, "w")
+        print('Writing cross sections for', mat)
+
+        f = open(newpath + '/' + mat, "w")
+        
+        f.write('\nnumberOfGroups '+ str(numGroups) + ';')
+        f.write('\ncapture    (' + np.array2string(capture_res, threshold=np.inf).replace('[','').replace(']','') + ');')
+        if np.any(fission_res) == False:
+            print('No fission cross section for {}'.format(mat))
             
-            f.write('\nnumberOfGroups '+ str(numGroups) + ';')
-            f.write('\ncapture    (' + np.array2string(capture[matIndex], threshold=np.inf).replace('[','').replace(']','') + ');')
-            if np.any(fission[matIndex]) == False:
-                print('No fission cross section for {}'.format(mat))
-                
+        else:
+            f.write('\nfission   (' + np.array2string(fission_res, threshold=np.inf).replace('[','').replace(']','') + ');')
+            f.write('\nnu ('+ np.array2string(nu_res, threshold=np.inf).replace('[','').replace(']','') + ');')
+            f.write('\nchi ('+ np.array2string(chi_res, threshold=np.inf).replace('[','').replace(']','') + ');')
+        f.write('\nscatteringMultiplicity ('+ np.array2string(prod_corrected_res.flatten(), threshold=np.inf).replace('[','').replace(']','') + ');')
+        f.write('\nP0 ('+ np.array2string(P0_corrected_res.flatten(), threshold=np.inf ).replace('[','').replace(']','') + ');')
+        f.write('\n' +r'//') # for some reason the file won't run unless these comment signs are at the bottom
+    
+        if plotting:
+            # ENERGY BOUNDS ORDER CORRECTION
+            print('Plotting cross sections for', mat)
+            print('WARNING: Energy Bounds are flipped for plotting because of SCONE printout error at time of coding')
+            EnergyBounds = np.flip(np.copy(EnergyBounds),1)
+            
+
+            fig, ax = plot.subplots()
+
+            x = (EnergyBounds[0] + EnergyBounds[1]) / 2
+            widths = (EnergyBounds[1]-EnergyBounds[0])
+
+            ax.bar(x, fission_res, width=widths,label='fission',color='green', edgecolor='black',)
+            ax.bar(x, capture_res, width=widths, label='capture',color='red', edgecolor='black', bottom=fission_res)
+            if len(EnergyBounds[0]) == 1:
+                print('One energy group only')
+                ax.bar(x, np.sum(P0_corrected_res,0).flatten(), width=widths, label='scatter', color='blue', edgecolor='black', bottom=fission_res+capture_res)
             else:
-                f.write('\nfission   (' + np.array2string(fission[matIndex], threshold=np.inf).replace('[','').replace(']','') + ');')
-                f.write('\nnu ('+ np.array2string(nu[matIndex], threshold=np.inf).replace('[','').replace(']','') + ');')
-                f.write('\nchi ('+ np.array2string(chi[matIndex], threshold=np.inf).replace('[','').replace(']','') + ');')
-            f.write('\nscatteringMultiplicity ('+ np.array2string(prod_corrected[matIndex].flatten(), threshold=np.inf).replace('[','').replace(']','') + ');')
-            f.write('\nP0 ('+ np.array2string(P0_corrected[matIndex].flatten(), threshold=np.inf ).replace('[','').replace(']','') + ');')
-            f.write('\n' +r'//') # for some reason the file won't run unless these comment signs are at the bottom
+                ax.bar(x, np.sum(P0_corrected_res[0],0), width=widths, label='scatter', color='blue', edgecolor='black', bottom=fission_res+capture_res)
+            ax.legend()
 
+            ax.set_xscale('log')
 
+            ax.set_ylabel('cm')
+            ax.set_xlabel('MeV')
+            ax.set_title('{:.0f} macroscopic group cross section(s) for {}.'.format(len(EnergyBounds[0]), mat))
+            plot.savefig(newpath + '/'+'Cross-sections_' + mat)
 
-
-
-# test
-# generate_mg_XS("SimplePin_MC_material_output.json", tcType = 'flux limited', switch='OFF')
-# generate_mg_XS("SimplePin_MC_output_64G.json", tcType = 'flux limited', switch='OFF')
-# generate_mg_XS("SimpleSlab_MC_output_1G.json", tcType = 'flux limited', switch='ON')
+            
+if __name__=="__main__":
+    # test
+    # generate_mg_XS("SimplePin_MC_material_output.json", tcType = 'flux limited', switch='OFF')
+    # generate_mg_XS("SimplePin_MC_output_64G.json", tcType = 'flux limited', switch='OFF', plotting=True)
+    generate_mg_XS("SimpleSlab_MC_output_1G.json", tcType = 'flux limited', switch='ON', plotting=True)
+    # generate_mg_XS("SimpleSlab_MC_output_wims172.json", tcType = 'flux limited', switch='ON', plotting=True)
+    # generate_mg_XS("SimplePin_MC_output_64G.json", tcType = 'flux limited', switch='ON', plotting=True)
