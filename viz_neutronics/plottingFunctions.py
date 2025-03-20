@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plot
 
 from viz_neutronics.input2json import parse_text_to_dict, save_to_json, stringTuple_to_array, dict2obj# run from outside module
-#from input2json import parse_text_to_dict, save_to_json,  dict2obj # run from within module
+# from input2json import parse_text_to_dict, save_to_json,  dict2obj # run from within module
 
 
 
@@ -93,17 +93,6 @@ def plotScatteringMatrices(outputFile):
 def plotFissionRatesMC(outputFile, normalise_plot=False, target=100):
     fissRate, fissRate_std = findFissRateMC(outputFile)
 
-    # flux = reactionRate[:,:,0,0]
-    # flux_std = reactionRate[:,:,0,1]
-    # fissRate = reactionRate[:,:,1,0]
-    # fissRate_std = reactionRate[:,:,1,1]
-    # X = np.array(outputs.active.pinFiss.XBounds)
-    # Y = np.array(outputs.active.pinFiss.XBounds)
-
-    # Average coordinates to point to the centre of cell rather than bounbdaries
-    # X =  (X[:0] + X[:1]) / 2
-    # Y =  (Y[:0] + Y[:1]) / 2
-
     fig, ax1 = plot.subplots()
     if normalise_plot == True:
         # fissRate = fissRate / np.max(fissRate)
@@ -114,29 +103,28 @@ def plotFissionRatesMC(outputFile, normalise_plot=False, target=100):
     fig.suptitle('Monte Carlo fission rate')
     plot.savefig('Fission_rate_MC')
 
+def plotFluxMC(outputFile, normalise_plot=False, target=100):
+    flux, flux_std = findFluxMC(outputFile)
+
+    fig, ax1 = plot.subplots()
+    if normalise_plot == True:
+      
+        flux = normalise(flux, target)
+        
+    val = ax1.imshow(flux)
+    fig.colorbar(val, ax=ax1)
+    fig.suptitle('Monte Carlo flux')
+    plot.savefig('Flux_MC')
+
 def plotFissionRatesRR(outputFile, normalise_plot=False, target=100):
     # outputs = readOutputs(outputFile)
     
     fissRate, fissRate_std = findFissRateRR(outputFile)
 
-    # X_fiss = (np.array(outputs.fiss1G.XBounds)[...,0] + np.array(outputs.fiss1G.XBounds)[...,1])/2
-    # Y_fiss = (np.array(outputs.fiss1G.YBounds)[...,0] + np.array(outputs.fiss1G.YBounds)[...,1])/2
-    # flux = np.array(outputs.flux1G.flux1G)[...,0]
-    # flux_std = np.array(outputs.flux1G.flux1G)[...,1]
-
-
-
-    # fissRate_std = reactionRate[:,:,1,1]
-    # X = np.array(outputs.active.pinFiss.XBounds)
-    # Y = np.array(outputs.active.pinFiss.XBounds)
-
-    # # Average coordinates to point to the centre of cell rather than bounbdaries
-    # X =  (X[:0] + X[:1]) / 2
-    # Y =  (Y[:0] + Y[:1]) / 2
-
+    
     fig, ax1 = plot.subplots()
 
-    if normalise == True:
+    if normalise_plot == True:
         # fissRate = fissRate / np.max(fissRate)
         fissRate = normalise(fissRate, target)
         
@@ -145,6 +133,43 @@ def plotFissionRatesRR(outputFile, normalise_plot=False, target=100):
 
     fig.suptitle('Random ray fission rate')
     plot.savefig('Fission_rate_RR')
+
+
+def plotFissionRatesRR_radial(outputFile, normalise_plot=False, target=100):
+    # outputs = readOutputs(outputFile)
+    # or line plot?
+    fissRate, fissRate_std, radialBounds = findFissRateRR_radial(outputFile)
+    if normalise_plot == True:
+        fissRate = normalise(fissRate, target)
+
+    r = (np.array(radialBounds)[...,0] + np.array(radialBounds)[...,1]) / 2  
+
+    fig, ax = plot.subplots()
+    ax.plot(r, fissRate, 'bo-')
+    ax.set_ylabel('Fission rate')
+    ax.set_xlabel('radius (cm)')
+    ax.set_title('Fission rate against radius')
+    plot.grid()
+    plot.savefig('Fission_rate_RR')
+
+
+
+def plotFissionRatesMC_radial(outputFile, normalise_plot=False, target=100):
+    # outputs = readOutputs(outputFile)
+    # or line plot?
+    fissRate, fissRate_std, radialBounds = findFissRateMC_radial(outputFile)
+    if normalise_plot == True:
+        fissRate = normalise(fissRate, target)
+
+    r = (np.array(radialBounds)[...,0] + np.array(radialBounds)[...,1]) / 2  
+
+    fig, ax = plot.subplots()
+    ax.plot(r, fissRate, 'bo-')
+    ax.set_ylabel('Fission rate')
+    ax.set_xlabel('radius (cm)')
+    ax.set_title('Fission rate against radius')
+    plot.grid()
+    plot.savefig('Fission_rate_MC')
 
     
 def plotFissionRatesCompareMC_RR(outputFileMC,outputFileRR, target=100):
@@ -168,19 +193,78 @@ def plotFissionRatesCompareMC_RR(outputFileMC,outputFileRR, target=100):
     plot.savefig('Fission_rate_rel_diff')
     return rel_diff
 
+def plotFissionRatesCompare_radial_MC_RR(outputFileMC,outputFileRR, target=100):
+
+    fissRateMC, fissRateMC_std, radialBoundsMC = findFissRateMC_radial(outputFileMC)
+    fissRateRR, fissRateRR_std, radialBoundsRR= findFissRateRR_radial(outputFileRR)
+    
+    fissRateMC = normalise(fissRateMC, target)
+    fissRateRR = normalise(fissRateRR, target)
+
+    r_MC = (np.array(radialBoundsMC)[...,0] + np.array(radialBoundsMC)[...,1]) / 2  
+    r_RR = (np.array(radialBoundsRR)[...,0] + np.array(radialBoundsRR)[...,1]) / 2  
+
+
+    # Calculate quantities
+    rel_diff = (np.array(fissRateRR) - np.array(fissRateMC)) / np.array(fissRateMC)
+    rel_diff = np.nan_to_num(rel_diff) * 100
+    
+    rmse = rmsError(fissRateMC, fissRateRR, target)
+    max_error = np.max(np.abs(rel_diff))
+
+
+    fig, ax = plot.subplots()
+
+    ax.plot(r_MC, rel_diff, 'bo-')
+
+    ax.set_ylabel('% (RR-MC)/MC')
+    ax.set_xlabel('radius (cm)')
+    plot.title('Fission rate against radius.\nMax error={:.4f}%, RMSE={:.4e}'.format(max_error, rmse))
+    plot.grid()
+    plot.savefig('Relative_diff_fission_rate')
+
+
 def findFissRateRR(outputFileRR):
     outputs = readOutputs(outputFileRR)
     fissRate = np.array(outputs.fiss1G.fiss1G)[...,0]
     fissRate_std = np.array(outputs.fiss1G.fiss1G)[...,1]
+ 
     return fissRate, fissRate_std
+
+def findFissRateRR_radial(outputFileRR):
+    outputs = readOutputs(outputFileRR)
+    fissRate = np.array(outputs.fiss1G.fiss1G)[...,0]
+    fissRate_std = np.array(outputs.fiss1G.fiss1G)[...,1]
+
+    radialBounds = outputs.fiss1G.radialMapRadialBounds
+
+    return fissRate, fissRate_std, radialBounds
+
 
 
 def findFissRateMC(outputFileMC):
     outputs = readOutputs(outputFileMC)
     reactionRate = np.array(outputs.active.pinFiss.Res)
-    fissRate = reactionRate[:,:,1,0]
-    fissRate_std = reactionRate[:,:,1,1]
+    fissRate = reactionRate[...,1,0]
+    fissRate_std = reactionRate[...,1,1]
     return fissRate, fissRate_std
+
+def findFissRateMC_radial(outputFileMC):
+    outputs = readOutputs(outputFileMC)
+    reactionRate = np.array(outputs.active.pinFiss.Res)
+    fissRate = reactionRate[...,1,0]
+    fissRate_std = reactionRate[...,1,1]
+    radialBounds = outputs.active.pinFiss.radialMapRadialBounds
+    return fissRate, fissRate_std, radialBounds
+
+
+
+def findFluxMC(outputFileMC):
+    outputs = readOutputs(outputFileMC)
+    reactionRate = np.array(outputs.active.pinFiss.Res)
+    flux = reactionRate[...,0,0]
+    flux_std = reactionRate[...,0,1]
+    return flux, flux_std
 
 def normalise(array, target):
     # array_norm = array / np.max(array)
@@ -202,3 +286,9 @@ def rmsError(actual_result, predicted_result, target = 100):
     rmse = np.sqrt(meanSquaredError) / np.max(actual_result)
     return rmse
 
+
+if __name__=='__main__':
+
+    # plotFissionRatesRR_radial('SimplePin_RR_output_radial.json', normalise_plot=True, target=100)
+    # plotFissionRatesMC_radial('SimplePin_MC_output_radial.json', normalise_plot=True, target=100)
+    plotFissionRatesCompare_radial_MC_RR('SimplePin_MC_output_radial.json', 'SimplePin_RR_output_radial.json')
