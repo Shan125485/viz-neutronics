@@ -6,8 +6,8 @@ import os
 import json
 from decimal import Decimal as dc
 import matplotlib.pyplot as plot
-# from viz_neutronics.input2json import dict2obj
-from input2json import dict2obj # when running test within this script
+from viz_neutronics.input2json import dict2obj
+# from input2json import dict2obj # when running test within this script
 import numpy as np
 
 
@@ -160,13 +160,13 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
             # ENERGY BOUNDS ORDER CORRECTION
             print('Plotting cross sections for', mat)
             print('WARNING: Energy Bounds are flipped for plotting because of SCONE printout error at time of coding')
-            EnergyBounds = np.flip(np.copy(EnergyBounds),1)
+            EnergyBounds_plot = np.flip(np.copy(EnergyBounds),1)
             
 
             fig, ax = plot.subplots()
 
-            x = (EnergyBounds[0] + EnergyBounds[1]) / 2
-            widths = (EnergyBounds[1]-EnergyBounds[0])
+            x = (EnergyBounds_plot[0] + EnergyBounds_plot[1]) / 2
+            widths = (EnergyBounds_plot[1]-EnergyBounds_plot[0])
 
             ax.bar(x, fission_res, width=widths,label='fission',color='green', edgecolor='black',)
             ax.bar(x, capture_res, width=widths, label='capture',color='red', edgecolor='black', bottom=fission_res)
@@ -181,14 +181,15 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
 
             ax.set_ylabel('cm')
             ax.set_xlabel('MeV')
-            ax.set_title('{:.0f} macroscopic group cross section(s) for {}.'.format(len(EnergyBounds[0]), mat))
+            ax.set_title('{:.0f} macroscopic group cross section(s) for {}.'.format(len(EnergyBounds_plot[0]), mat))
+            plot.grid()
             plot.savefig(newpath + '/'+'Cross-sections_' + mat)
 
             
 if __name__=="__main__":
     # test
     # generate_mg_XS("SimplePin_MC_material_output.json", tcType = 'flux limited', switch='OFF')
-    # generate_mg_XS("SimplePin_MC_output_64G.json", tcType = 'flux limited', switch='OFF', plotting=True)
-    generate_mg_XS("SimpleSlab_MC_output_1G.json", tcType = 'flux limited', switch='ON', plotting=True)
+    generate_mg_XS("SimplePin_MC_output_64G.json", tcType = 'flux limited', switch='OFF', plotting=True)
+    # generate_mg_XS("SimpleSlab_MC_output_1G.json", tcType = 'flux limited', switch='ON', plotting=True)
     # generate_mg_XS("SimpleSlab_MC_output_wims172.json", tcType = 'flux limited', switch='ON', plotting=True)
     # generate_mg_XS("SimplePin_MC_output_64G.json", tcType = 'flux limited', switch='ON', plotting=True)
