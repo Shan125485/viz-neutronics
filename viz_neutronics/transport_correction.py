@@ -15,6 +15,7 @@ import numpy as np
 def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2string, switch='ON', plotting=False):
     """
     Summary: This script works for Material Maps. If there is no material map...
+    
     filepath_MC_output (np.array2string) : The filepath to the Monte Carlo output file containing multigroup cross sections
     tcType (np.array2string) : Transport correction type. Can be either 'flux limited' or 'outscatter'
     switch (np.array2string) : 'ON' or 'OFF' If off, no correction is applied
@@ -45,7 +46,7 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
         MaterialBins = ['material'] # for a single material
         numGroups = len(EnergyBounds[0])
         numMat = 1
-    print('{:.0f} energy groups,{:.0f} material (s)'.format(numGroups, numMat))
+    print('\n{:.0f} energy groups,{:.0f} material (s)'.format(numGroups, numMat))
 
 
     capture = np.array(sm.capture)[...,0]
@@ -57,10 +58,8 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
     P0 = np.array(sm.P0)[...,0]
     prod = np.array(sm.prod)[...,0]
 
-    print('Capture XS')
-    print(capture)
-
     if hasattr(sm, 'P1'):
+        print('\nHigher order PN cross sections detected')
         P1 = np.array(sm.P1)
         P2 = np.array(sm.P2)
         P3 = np.array(sm.P3)
@@ -69,10 +68,9 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
         P6 = np.array(sm.P6)
         P7 = np.array(sm.P7)
     else:
-        print('No higher order PN results found')
+        print('\nNo higher order PN results found')
 
     # reshape scattering XS and scattering multiplicity arrays
-
     P0 = np.reshape(P0, (numMat, numGroups,numGroups))
     prod = np.reshape(prod, (numMat, numGroups,numGroups))
 
@@ -82,7 +80,7 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
 
 
     if switch == 'ON':
-
+       
         # calculate transport correction
         correction_FluxLimited = total - transportFluxLimited
         correction_OutScatter = total - transportOutScatter
@@ -90,31 +88,32 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
         # apply transport correction
         P0_corrected = np.copy(P0)
         prod_corrected = np.copy(prod)
+
         for g in range(numGroups):
             if tcType == 'outscatter':
+                transportXS = transportOutScatter
+                correction = correction_OutScatter
                 P0_corrected[..., g,g] = P0[..., g,g] - correction_OutScatter[..., g]
             elif tcType == 'flux limited':
+                transportXS = transportFluxLimited
+                correction = correction_FluxLimited
                 P0_corrected[..., g,g] = P0[..., g,g] - correction_FluxLimited[..., g]
             else:
-                raise ValueError('No correction to scattering cross section was applied')
-
-            prod_corrected[..., g,g] = (prod[..., g,g] - 1) * P0[..., g,g] / P0_corrected[..., g,g] + 1
-
-        
-        print('P0 corrected')
-        print(P0_corrected)
+                raise ValueError('tctype argument must be one of ["outscatter","flux limited"]. No correction to scattering cross section was applied')
+            
+            prod_corrected[..., g,g] = (prod[..., g,g] - 1) * P0[..., g,g] / P0_corrected[..., g,g] + 1        
     
     elif switch == 'OFF':
-        print('WARNING: No transport correction applied. Argument switch is OFF')
+        print('\nWARNING: No transport correction applied. Argument switch is OFF')
         # no change
         P0_corrected = np.copy(P0)
         prod_corrected = np.copy(prod)
-        print('P0')
-        print(P0_corrected)
 
-
-    # writes an output file for each material name material1, material2 etc.
-
+    # Address divide-by-zero issues when P0 cross section is 0. Set scattering multiplicity in these cases to 1 to avoid a NaN.
+    if np.any(np.isnan(prod_corrected)):
+        prod_corrected=np.where(np.isnan(prod_corrected), 1, prod_corrected)
+       
+    # write an output file for each material name material1, material2 etc.
     newpath = 'materialsInputs'
     if not os.path.exists(newpath):
         os.makedirs(newpath)
@@ -126,8 +125,8 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
             fission_res = np.copy(fission)
             nu_res = np.copy(nu)
             chi_res = np.copy(chi)
-            prod_corrected_res = np.copy(prod_corrected)
-            P0_corrected_res = np.copy( P0_corrected)
+            transportXS_res = np.copy(transportXS)
+            correction_res = np.copy(correction)
 
         elif numMat > 1:
            
@@ -136,17 +135,20 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
             fission_res = np.copy(fission[matIndex])
             nu_res = np.copy(nu[matIndex])
             chi_res = np.copy(chi[matIndex])
-            prod_corrected_res = np.copy(prod_corrected[matIndex])
-            P0_corrected_res = np.copy( P0_corrected[matIndex])
+            transportXS_res = np.copy(transportXS[matIndex])
+            correction_res = np.copy(correction[matIndex])
 
-        print('Writing cross sections for', mat)
+        prod_corrected_res = np.copy(prod_corrected[matIndex])
+        P0_corrected_res = np.copy( P0_corrected[matIndex])
+
+        print('\nWriting cross sections for', mat, 'to file.')
 
         f = open(newpath + '/' + mat, "w")
         
         f.write('\nnumberOfGroups '+ str(numGroups) + ';')
         f.write('\ncapture    (' + np.array2string(capture_res, threshold=np.inf).replace('[','').replace(']','') + ');')
         if np.any(fission_res) == False:
-            print('No fission cross section for {}'.format(mat))
+            print('\nNo fission cross section written for {}'.format(mat))
             
         else:
             f.write('\nfission   (' + np.array2string(fission_res, threshold=np.inf).replace('[','').replace(']','') + ');')
@@ -158,8 +160,8 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
     
         if plotting:
             # ENERGY BOUNDS ORDER CORRECTION
-            print('Plotting cross sections for', mat)
-            print('WARNING: Energy Bounds are flipped for plotting because of SCONE printout error at time of coding')
+            print('\nPlotting cross sections for', mat)
+            print('\nWARNING: Energy Bounds are flipped for plotting because of SCONE printout error at time of coding')
             EnergyBounds_plot = np.flip(np.copy(EnergyBounds),1)
             
 
@@ -170,26 +172,82 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
 
             ax.bar(x, fission_res, width=widths,label='fission',color='green', edgecolor='black',)
             ax.bar(x, capture_res, width=widths, label='capture',color='red', edgecolor='black', bottom=fission_res)
-            if len(EnergyBounds[0]) == 1:
-                print('One energy group only')
-                ax.bar(x, np.sum(P0_corrected_res,0).flatten(), width=widths, label='scatter', color='blue', edgecolor='black', bottom=fission_res+capture_res)
+            if numGroups == 1:
+                print('\nOne energy group only')
+                ax.bar(x, np.sum(P0_corrected_res,1).flatten(), width=widths, label='scatter', color='blue', edgecolor='black', bottom=fission_res+capture_res)
             else:
-                ax.bar(x, np.sum(P0_corrected_res[0],0), width=widths, label='scatter', color='blue', edgecolor='black', bottom=fission_res+capture_res)
+                ax.bar(x, np.sum(P0_corrected_res,1), width=widths, label='scatter', color='blue', edgecolor='black', bottom=fission_res+capture_res)
             ax.legend()
 
             ax.set_xscale('log')
 
             ax.set_ylabel('cm')
             ax.set_xlabel('MeV')
-            ax.set_title('{:.0f} macroscopic group cross section(s) for {}.'.format(len(EnergyBounds_plot[0]), mat))
+ 
+            ax.set_title('{:.0f} macroscopic group cross section(s) for {}.'.format(numGroups, mat))
             plot.grid()
-            plot.savefig(newpath + '/'+'Cross-sections_' + mat)
+            plot.savefig(newpath + '/'+'Cross-sections_' + mat + '.svg')
+
+
+            # plot transport corrections in the same way, sharing some variables.
+            print('\nPlotting transport cross sections for', mat)
+            
+            fig, ax = plot.subplots()
+
+            if tcType == 'outscatter':
+                transportXS = transportOutScatter
+            elif tcType == 'flux limited':
+                transportXS = transportFluxLimited
+            ax.bar(x, correction_res, width=widths,label='Transport correction',color='orange', edgecolor='black')
+         
+            ax.set_xscale('log')
+            ax.set_ylabel('cm')
+            ax.set_xlabel('MeV')
+            ax.set_title('{:.0f} {} transport correction(s) for {}.'.format(numGroups, tcType, mat))
+            plot.grid()
+            plot.savefig(newpath + '/'+'Transport_correction_' + mat + '.svg')
+
+            # Also plot the scattering matrices:
+            # ideally should plot all XS, P0 and P1.
+            print('\nPlotting scattering matrices for', mat)
+            fig, ((axP0, axProd)) = plot.subplots(1,2)
+
+            max_abs_P0 = np.max(np.abs(P0_corrected_res))
+            # max_abs_prod = np.max(np.abs(prod_corrected_res))
+
+            P0_scale = axP0.imshow(P0_corrected_res, cmap='RdBu_r', vmin=-max_abs_P0, vmax=max_abs_P0)
+            prod_scale = axProd.imshow(prod_corrected_res, cmap='Blues', vmin=1)
+
+            fig.colorbar(P0_scale, ax=axP0).minorticks_on()
+            fig.colorbar(prod_scale, ax=axProd).minorticks_on()
+
+            # sanity check
+            max_P0 = np.max(P0_corrected_res)
+            min_P0 = np.min(P0_corrected_res)
+
+            max_prod = np.max(prod_corrected_res)
+            min_prod = np.min(prod_corrected_res)
+
+            axP0.set_title('P0\nMin={:.2f}, max={:.2f}'.format(min_P0, max_P0))
+            axProd.set_title('Scattering multiplicity.\nMin={:.4f}, max={:.4f}'.format(min_prod, max_prod))
+
+            axP0.set_aspect('equal')
+            axProd.set_aspect('equal')
+ 
+            # fig.colorbar(P0)
+            fig.suptitle("Scattering matrices, {} group(s), for {}".format(numGroups, mat))
+     
+            plot.tight_layout()
+
+            plot.savefig(newpath + '/' + 'scattering_colourmap_'  + mat+'.svg')
 
             
 if __name__=="__main__":
     # test
     # generate_mg_XS("SimplePin_MC_material_output.json", tcType = 'flux limited', switch='OFF')
-    generate_mg_XS("SimplePin_MC_output_64G.json", tcType = 'flux limited', switch='OFF', plotting=True)
+    # generate_mg_XS("SimplePin_MC_output_64G.json", tcType = 'flux limited', switch='OFF', plotting=True)
     # generate_mg_XS("SimpleSlab_MC_output_1G.json", tcType = 'flux limited', switch='ON', plotting=True)
     # generate_mg_XS("SimpleSlab_MC_output_wims172.json", tcType = 'flux limited', switch='ON', plotting=True)
-    # generate_mg_XS("SimplePin_MC_output_64G.json", tcType = 'flux limited', switch='ON', plotting=True)
+    # generate_mg_XS("SimplePin_MC_output_64G.json", tcType = 'flux limited', switch='OFF', plotting=True)
+    generate_mg_XS("SimplePin_MC_output_70G_problematic.json", tcType = 'flux limited', switch='ON', plotting=True)
+    # generate_mg_XS("SimpleSlabVacuum_MC_output_6G.json", tcType = 'outscatter', switch='OFF', plotting=True) 
