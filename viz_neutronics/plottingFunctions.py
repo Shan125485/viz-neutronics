@@ -224,6 +224,53 @@ def plotFissionRatesCompare_radial_MC_RR(outputFileMC,outputFileRR, target=100):
     plot.savefig('Relative_diff_fission_rate')
 
 
+def plotFluxSpectrumMC(outputFileMC):
+    outputs = readOutputs(outputFileMC)
+    fs = outputs.active.fluxSpectrum
+    res = np.array(fs.Res)
+    EnergyBounds_plot = np.flip(np.array(fs.EnergyBounds), 1)
+    x = (EnergyBounds_plot[0] + EnergyBounds_plot[1]) / 2 # for plotting
+
+    if hasattr(fs, 'MaterialBins'):
+        material_list = np.array(fs.MaterialBins)
+    else:
+        material_list = np.array(['material'])
+    
+    i=0
+    for material in material_list:
+        
+        [material] = material
+        print(material)
+        
+        flux_res_material = res[i]
+        flux_res = flux_res_material[..., 0][:,0]
+   
+        i = i+1
+
+        fig, ax = plot.subplots()
+        
+        widths = (EnergyBounds_plot[1]-EnergyBounds_plot[0])
+
+        # ax.bar(x, flux_res, width=widths,label=material, edgecolor='black')
+        ax.bar(x, flux_res, width=widths, edgecolor='black')
+ 
+
+        ax.set_xscale('log')
+
+        ax.set_ylabel('Flux')
+        ax.set_xlabel('MeV')
+        ax.set_title('{:.0f} groups, flux for {}.'.format(len(EnergyBounds_plot[0]), material))
+        plot.grid()
+        plot.savefig('Flux_spectrum_' + material)
+       
+       
+        
+
+
+
+
+
+
 def findFissRateRR(outputFileRR):
     outputs = readOutputs(outputFileRR)
     fissRate = np.array(outputs.fiss1G.fiss1G)[...,0]
@@ -291,4 +338,7 @@ if __name__=='__main__':
 
     # plotFissionRatesRR_radial('SimplePin_RR_output_radial.json', normalise_plot=True, target=100)
     # plotFissionRatesMC_radial('SimplePin_MC_output_radial.json', normalise_plot=True, target=100)
-    plotFissionRatesCompare_radial_MC_RR('SimplePin_MC_output_radial.json', 'SimplePin_RR_output_radial.json')
+    # plotFissionRatesCompare_radial_MC_RR('SimplePin_MC_output_radial.json', 'SimplePin_RR_output_radial.json')
+    # plotFluxSpectrumMC('SimplePin_MC_output_fluxSpectrum.json')
+    # plotScatteringMatrices('SimplePin_MC_output_70G_problematic.json')
+    plotFluxSpectrumMC('SimplePin_MC_output_70G_problematic.json')
