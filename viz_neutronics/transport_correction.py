@@ -4,6 +4,7 @@
 
 import os
 import json
+import re
 from decimal import Decimal as dc
 import matplotlib.pyplot as plot
 from viz_neutronics.input2json import dict2obj
@@ -78,12 +79,12 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
     scatter = np.sum(P0,-1) # sum along each row of the scattering matrix to get the total scatter cross section
     total = fission + capture + scatter
 
+    # calculate transport correction
+    correction_FluxLimited = total - transportFluxLimited
+    correction_OutScatter = total - transportOutScatter
+
 
     if switch == 'ON':
-       
-        # calculate transport correction
-        correction_FluxLimited = total - transportFluxLimited
-        correction_OutScatter = total - transportOutScatter
 
         # apply transport correction
         P0_corrected = np.copy(P0)
@@ -108,10 +109,22 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
         # no change
         P0_corrected = np.copy(P0)
         prod_corrected = np.copy(prod)
+        if tcType == 'outscatter':
+            transportXS = transportOutScatter
+            correction = correction_OutScatter
+        elif tcType == 'flux limited':
+            transportXS = transportFluxLimited
+            correction = correction_FluxLimited
 
     # Address divide-by-zero issues when P0 cross section is 0. Set scattering multiplicity in these cases to 1 to avoid a NaN.
-    if np.any(np.isnan(prod_corrected)):
-        prod_corrected=np.where(np.isnan(prod_corrected), 1, prod_corrected)
+    print('WARNING: Addressing divide-by-zero issue with P0 by setting scattering mutiplicity to 1 in select cases.')
+    prod_corrected=np.where(np.isnan(prod_corrected), 1, prod_corrected)
+
+    # Address issue where a 0 total cross section results in divide-by-zero errors for the transport solver for that group.
+    # Locate where total cross section is 0, give a tiny non-zero XS to capture cross section:
+    print('WARNING: Addressing divide-by-zero issue with total cross section by setting capture cross section to 1e-9 in this group.')
+    capture = np.where(total<1e-15, 1e-9, capture)
+    
        
     # write an output file for each material name material1, material2 etc.
     newpath = 'materialsInputs'
@@ -127,6 +140,7 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
             chi_res = np.copy(chi)
             transportXS_res = np.copy(transportXS)
             correction_res = np.copy(correction)
+            total_res = np.copy(total)
 
         elif numMat > 1:
            
@@ -137,6 +151,7 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
             chi_res = np.copy(chi[matIndex])
             transportXS_res = np.copy(transportXS[matIndex])
             correction_res = np.copy(correction[matIndex])
+            total_res = np.copy(total[matIndex])
 
         prod_corrected_res = np.copy(prod_corrected[matIndex])
         P0_corrected_res = np.copy( P0_corrected[matIndex])
@@ -154,6 +169,7 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
             f.write('\nfission   (' + np.array2string(fission_res, threshold=np.inf).replace('[','').replace(']','') + ');')
             f.write('\nnu ('+ np.array2string(nu_res, threshold=np.inf).replace('[','').replace(']','') + ');')
             f.write('\nchi ('+ np.array2string(chi_res, threshold=np.inf).replace('[','').replace(']','') + ');')
+  
         f.write('\nscatteringMultiplicity ('+ np.array2string(prod_corrected_res.flatten(), threshold=np.inf).replace('[','').replace(']','') + ');')
         f.write('\nP0 ('+ np.array2string(P0_corrected_res.flatten(), threshold=np.inf ).replace('[','').replace(']','') + ');')
         f.write('\n' +r'//') # for some reason the file won't run unless these comment signs are at the bottom
@@ -193,11 +209,6 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
             print('\nPlotting transport cross sections for', mat)
             
             fig, ax = plot.subplots()
-
-            if tcType == 'outscatter':
-                transportXS = transportOutScatter
-            elif tcType == 'flux limited':
-                transportXS = transportFluxLimited
             ax.bar(x, correction_res, width=widths,label='Transport correction',color='orange', edgecolor='black')
          
             ax.set_xscale('log')
@@ -206,6 +217,20 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
             ax.set_title('{:.0f} {} transport correction(s) for {}.'.format(numGroups, tcType, mat))
             plot.grid()
             plot.savefig(newpath + '/'+'Transport_correction_' + mat + '.svg')
+
+            # plot transport correction ratio in the same way, sharing some variables.
+            print('\nPlotting transport correction ratio for', mat)
+
+            fig, ax = plot.subplots()
+
+            ax.bar(x, transportXS_res / total_res, width=widths,label='Transport correction ratio',color='yellow', edgecolor='black')
+         
+            ax.set_xscale('log')
+            ax.set_ylabel('cm')
+            ax.set_xlabel('MeV')
+            ax.set_title('{:.0f} group, {}\n{} transport cross-section: total cross-section ratio'.format(numGroups,mat, tcType))
+            plot.grid()
+            plot.savefig(newpath + '/'+'Transport_correction_ratio_' + mat + '.svg')
 
             # Also plot the scattering matrices:
             # ideally should plot all XS, P0 and P1.
