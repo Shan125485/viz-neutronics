@@ -4,8 +4,6 @@
 
 import os
 import json
-import re
-from decimal import Decimal as dc
 import matplotlib.pyplot as plot
 from viz_neutronics.input2json import dict2obj
 # from input2json import dict2obj # when running test within this script
@@ -101,8 +99,8 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
     # uncertainties
     P0_unc = np.reshape(P0_unc, (numMat, numGroups,numGroups))
     prod_unc = np.reshape(prod_unc, (numMat, numGroups,numGroups))
-    scatter_unc = np.sum(P0_unc,-1) # hope this is right
-    total_unc = fission_unc + capture_unc + scatter_unc
+    scatter_unc_temp = np.sum(P0_unc,-1) # hope this is right
+    total_unc = fission_unc + capture_unc + scatter_unc_temp
 
 
 
@@ -114,6 +112,7 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
 
         # uncertainty
         P0_corrected_unc = np.copy(P0_unc)
+
 
 
         for g in range(numGroups):
@@ -145,6 +144,10 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
         # no change
         P0_corrected = np.copy(P0)
         prod_corrected = np.copy(prod)
+
+        # uncertainty
+        P0_corrected_unc = np.copy(P0_unc)
+
         if tcType == 'outscatter':
             transportXS = transportOutScatter
             correction = correction_OutScatter
@@ -188,6 +191,8 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
 
             # uncertainty
             total_unc_res = np.copy(total_unc)
+            capture_unc_res = np.copy(capture_unc)
+            fission_unc_res = np.copy(fission_unc)
             transportXS_unc_res = np.copy(transportXS_unc) 
             correction_unc_res = np.copy(correction_unc) 
 
@@ -207,12 +212,17 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
 
             # uncertainty
             total_unc_res = np.copy(total_unc[matIndex])
+            capture_unc_res = np.copy(capture_unc[matIndex])
+            fission_unc_res = np.copy(fission_unc[matIndex])
             transportXS_unc_res = np.copy(transportXS_unc[matIndex]) 
             correction_unc_res = np.copy(correction_unc[matIndex]) 
 
 
         prod_corrected_res = np.copy(prod_corrected[matIndex])
         P0_corrected_res = np.copy( P0_corrected[matIndex])
+
+        # uncertainty
+        P0_corrected_unc_res = np.copy(P0_corrected_unc[matIndex])
 
         print('\nWriting cross sections for', mat, 'to file.')
 
@@ -249,12 +259,20 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
             if numGroups == 1:
                 print('\nOne energy group only')
                 ax.bar(x, np.sum(P0_corrected_res,1).flatten(), width=widths, label='scatter', color='blue', edgecolor='black', bottom=fission_res+capture_res)
+                
+                # uncertainty
+                scatter_unc_res = np.sum(P0_corrected_unc_res, 1).flatten()
+
             else:
                 ax.bar(x, np.sum(P0_corrected_res,1), width=widths, label='scatter', color='blue', edgecolor='black', bottom=fission_res+capture_res)
+                # uncertainty
+                scatter_unc_res = np.sum(P0_corrected_unc_res, 1)
             ax.legend()
 
+
             # uncertainty
-            ax.errorbar(x, total_res, yerr=total_unc_res, fmt='none', ecolor='black', elinewidth=0.5, capsize=2)
+            sumXS_unc = capture_unc_res + fission_unc_res + scatter_unc_res
+            ax.errorbar(x, total_res, yerr=sumXS_unc, fmt='none', ecolor='black', elinewidth=0.5, capsize=2)
 
             ax.set_xscale('log')
 
@@ -283,12 +301,21 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
             plot.grid()
             plot.savefig(newpath + '/'+'Transport_correction_' + mat + '.svg')
             plot.close()
+
             # plot transport correction ratio in the same way, sharing some variables.
             print('\nPlotting transport correction ratio for', mat)
 
             fig, ax = plot.subplots()
 
-            ax.bar(x, transportXS_res / total_res, width=widths,label='Transport correction ratio',color='yellow', edgecolor='black')
+            ratio = transportXS_res / total_res
+            ax.bar(x, ratio, width=widths,label='Transport correction ratio',color='yellow', edgecolor='black')
+
+            # uncertainty
+            total_unc_res_rel = total_unc_res / total_res
+            transportXS_unc_res_rel = transportXS_unc_res / transportXS_res
+            ratio_unc_rel = total_unc_res_rel + transportXS_unc_res_rel
+            ratio_unc_abs = ratio_unc_rel * ratio
+            ax.errorbar(x, ratio, yerr=ratio_unc_abs, fmt='none', ecolor='black', elinewidth=0.5, capsize=2)
          
             ax.set_xscale('log')
             ax.set_ylabel('transport / total')
@@ -341,4 +368,5 @@ if __name__=="__main__":
     # generate_mg_XS("SimplePin_MC_output_64G.json", tcType = 'flux limited', switch='OFF', plotting=True)
     # generate_mg_XS("SimplePin_MC_output_70G_problematic.json", tcType = 'flux limited', switch='ON', plotting=True)
     # generate_mg_XS("SimpleSlabVacuum_MC_output_6G.json", tcType = 'outscatter', switch='OFF', plotting=True) 
-    generate_mg_XS("SimplePin_MC_output_10^8.json", tcType = 'flux limited', switch='OFF', plotting=True)
+    generate_mg_XS("SimplePin_MC_output_10^8.json", tcType = 'flux limited', switch='ON', plotting=True)
+    # generate_mg_XS("SimplePin_MC_output_CASMO7.json", tcType = 'flux limited', switch='ON', plotting=True)
