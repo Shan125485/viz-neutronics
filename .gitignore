@@ -22,3 +22,10 @@ Thumbs.db
 build/
 dist/
 *.egg-info/
+
+# generated images
+*.svg
+*.png
+
+# generated material inputs
+materialsInputs/*
