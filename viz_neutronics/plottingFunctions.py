@@ -341,4 +341,4 @@ if __name__=='__main__':
     # plotFissionRatesCompare_radial_MC_RR('SimplePin_MC_output_radial.json', 'SimplePin_RR_output_radial.json')
     # plotFluxSpectrumMC('SimplePin_MC_output_fluxSpectrum.json')
     # plotScatteringMatrices('SimplePin_MC_output_70G_problematic.json')
-    plotFluxSpectrumMC('SimplePin_MC_output_70G_problematic.json')
+    plotFluxSpectrumMC('SimplePin_MC_output_10^8.json')

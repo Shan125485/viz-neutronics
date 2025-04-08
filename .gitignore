@@ -29,3 +29,7 @@ dist/
 
 # generated material inputs
 materialsInputs/*
+
+# generated input and output files
+input.json
+nuclearDensityOutputs.txt

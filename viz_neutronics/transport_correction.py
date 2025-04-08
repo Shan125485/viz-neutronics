@@ -59,6 +59,20 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
     P0 = np.array(sm.P0)[...,0]
     prod = np.array(sm.prod)[...,0]
 
+
+    # uncertainties
+
+    capture_unc = np.array(sm.capture)[...,1]
+    fission_unc = np.array(sm.fission)[...,1]
+    transportFluxLimited_unc = np.array(sm.transportFluxLimited)[...,1]
+    transportOutScatter_unc = np.array(sm.transportOutScatter)[...,1]
+    nu_unc = np.array(sm.nu)[...,1]
+    chi_unc = np.array(sm.chi)[...,1]
+    P0_unc = np.array(sm.P0)[...,1]
+    prod_unc = np.array(sm.prod)[...,1]
+
+
+
     if hasattr(sm, 'P1'):
         print('\nHigher order PN cross sections detected')
         P1 = np.array(sm.P1)
@@ -79,9 +93,17 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
     scatter = np.sum(P0,-1) # sum along each row of the scattering matrix to get the total scatter cross section
     total = fission + capture + scatter
 
+
     # calculate transport correction
     correction_FluxLimited = total - transportFluxLimited
     correction_OutScatter = total - transportOutScatter
+
+    # uncertainties
+    P0_unc = np.reshape(P0_unc, (numMat, numGroups,numGroups))
+    prod_unc = np.reshape(prod_unc, (numMat, numGroups,numGroups))
+    scatter_unc = np.sum(P0_unc,-1) # hope this is right
+    total_unc = fission_unc + capture_unc + scatter_unc
+
 
 
     if switch == 'ON':
@@ -90,15 +112,29 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
         P0_corrected = np.copy(P0)
         prod_corrected = np.copy(prod)
 
+        # uncertainty
+        P0_corrected_unc = np.copy(P0_unc)
+
+
         for g in range(numGroups):
             if tcType == 'outscatter':
                 transportXS = transportOutScatter
                 correction = correction_OutScatter
                 P0_corrected[..., g,g] = P0[..., g,g] - correction_OutScatter[..., g]
+
+                # uncertainty
+                transportXS_unc = transportOutScatter_unc
+                correction_unc = total_unc + transportXS_unc
+                P0_corrected_unc[..., g,g] = P0_unc[..., g,g] + correction_unc[..., g]
             elif tcType == 'flux limited':
                 transportXS = transportFluxLimited
                 correction = correction_FluxLimited
                 P0_corrected[..., g,g] = P0[..., g,g] - correction_FluxLimited[..., g]
+
+                # uncertainty
+                transportXS_unc = transportFluxLimited_unc
+                correction_unc = total_unc + transportXS_unc
+                P0_corrected_unc[..., g,g] = P0_unc[..., g,g] + correction_unc[..., g]
             else:
                 raise ValueError('tctype argument must be one of ["outscatter","flux limited"]. No correction to scattering cross section was applied')
             
@@ -112,9 +148,17 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
         if tcType == 'outscatter':
             transportXS = transportOutScatter
             correction = correction_OutScatter
+
+            # uncertainty
+            transportXS_unc = transportOutScatter_unc
+            correction_unc = total_unc + transportXS_unc
         elif tcType == 'flux limited':
             transportXS = transportFluxLimited
             correction = correction_FluxLimited
+
+            # uncertainty
+            transportXS_unc = transportFluxLimited_unc
+            correction_unc = total_unc + transportXS_unc
 
     # Address divide-by-zero issues when P0 cross section is 0. Set scattering multiplicity in these cases to 1 to avoid a NaN.
     print('WARNING: Addressing divide-by-zero issue with P0 by setting scattering mutiplicity to 1 in select cases.')
@@ -122,8 +166,8 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
 
     # Address issue where a 0 total cross section results in divide-by-zero errors for the transport solver for that group.
     # Locate where total cross section is 0, give a tiny non-zero XS to capture cross section:
-    print('WARNING: Addressing divide-by-zero issue with total cross section by setting capture cross section to 1e-9 in this group.')
-    capture = np.where(total<1e-15, 1e-9, capture)
+    print('WARNING: Addressing divide-by-zero issue with total cross section by setting capture cross section to 1e-3 in this group.')
+    capture = np.where(total<1e-15, 0.001, capture)
     
        
     # write an output file for each material name material1, material2 etc.
@@ -142,6 +186,13 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
             correction_res = np.copy(correction)
             total_res = np.copy(total)
 
+            # uncertainty
+            total_unc_res = np.copy(total_unc)
+            transportXS_unc_res = np.copy(transportXS_unc) 
+            correction_unc_res = np.copy(correction_unc) 
+
+
+
         elif numMat > 1:
            
             [mat] = MaterialBins[matIndex] 
@@ -152,6 +203,13 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
             transportXS_res = np.copy(transportXS[matIndex])
             correction_res = np.copy(correction[matIndex])
             total_res = np.copy(total[matIndex])
+
+
+            # uncertainty
+            total_unc_res = np.copy(total_unc[matIndex])
+            transportXS_unc_res = np.copy(transportXS_unc[matIndex]) 
+            correction_unc_res = np.copy(correction_unc[matIndex]) 
+
 
         prod_corrected_res = np.copy(prod_corrected[matIndex])
         P0_corrected_res = np.copy( P0_corrected[matIndex])
@@ -195,29 +253,36 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
                 ax.bar(x, np.sum(P0_corrected_res,1), width=widths, label='scatter', color='blue', edgecolor='black', bottom=fission_res+capture_res)
             ax.legend()
 
+            # uncertainty
+            ax.errorbar(x, total_res, yerr=total_unc_res, fmt='none', ecolor='black', elinewidth=0.5, capsize=2)
+
             ax.set_xscale('log')
 
-            ax.set_ylabel('cm')
+            ax.set_ylabel('cm^-1')
             ax.set_xlabel('MeV')
  
             ax.set_title('{:.0f} macroscopic group cross section(s) for {}.'.format(numGroups, mat))
             plot.grid()
             plot.savefig(newpath + '/'+'Cross-sections_' + mat + '.svg')
+            plot.close()
 
 
             # plot transport corrections in the same way, sharing some variables.
-            print('\nPlotting transport cross sections for', mat)
+            print('\nPlotting transport corrections for', mat)
             
             fig, ax = plot.subplots()
             ax.bar(x, correction_res, width=widths,label='Transport correction',color='orange', edgecolor='black')
+
+            # uncertainty
+            ax.errorbar(x, correction_res, yerr=correction_unc_res, fmt='none', ecolor='black', elinewidth=0.5, capsize=2)
          
             ax.set_xscale('log')
-            ax.set_ylabel('cm')
+            ax.set_ylabel('cm^-1')
             ax.set_xlabel('MeV')
             ax.set_title('{:.0f} {} transport correction(s) for {}.'.format(numGroups, tcType, mat))
             plot.grid()
             plot.savefig(newpath + '/'+'Transport_correction_' + mat + '.svg')
-
+            plot.close()
             # plot transport correction ratio in the same way, sharing some variables.
             print('\nPlotting transport correction ratio for', mat)
 
@@ -226,12 +291,12 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
             ax.bar(x, transportXS_res / total_res, width=widths,label='Transport correction ratio',color='yellow', edgecolor='black')
          
             ax.set_xscale('log')
-            ax.set_ylabel('cm')
+            ax.set_ylabel('transport / total')
             ax.set_xlabel('MeV')
             ax.set_title('{:.0f} group, {}\n{} transport cross-section: total cross-section ratio'.format(numGroups,mat, tcType))
             plot.grid()
             plot.savefig(newpath + '/'+'Transport_correction_ratio_' + mat + '.svg')
-
+            plot.close()
             # Also plot the scattering matrices:
             # ideally should plot all XS, P0 and P1.
             print('\nPlotting scattering matrices for', mat)
@@ -265,7 +330,7 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
             plot.tight_layout()
 
             plot.savefig(newpath + '/' + 'scattering_colourmap_'  + mat+'.svg')
-
+            plot.close()
             
 if __name__=="__main__":
     # test
@@ -274,5 +339,6 @@ if __name__=="__main__":
     # generate_mg_XS("SimpleSlab_MC_output_1G.json", tcType = 'flux limited', switch='ON', plotting=True)
     # generate_mg_XS("SimpleSlab_MC_output_wims172.json", tcType = 'flux limited', switch='ON', plotting=True)
     # generate_mg_XS("SimplePin_MC_output_64G.json", tcType = 'flux limited', switch='OFF', plotting=True)
-    generate_mg_XS("SimplePin_MC_output_70G_problematic.json", tcType = 'flux limited', switch='ON', plotting=True)
+    # generate_mg_XS("SimplePin_MC_output_70G_problematic.json", tcType = 'flux limited', switch='ON', plotting=True)
     # generate_mg_XS("SimpleSlabVacuum_MC_output_6G.json", tcType = 'outscatter', switch='OFF', plotting=True) 
+    generate_mg_XS("SimplePin_MC_output_10^8.json", tcType = 'flux limited', switch='OFF', plotting=True)

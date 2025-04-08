@@ -43,14 +43,14 @@ Gd2O3 = {"density": Gd2O3_density, "wtPerc": wtPercentGd , "Mr": None, "Gd": Gd,
 # ENRICHED URANIUM INPUTS
 # enrichment = 0.021
 # enrichment = 0.032
-enrichment = 0.042
+enrichment = 0.024
 U_235 = {"Mr": 235, "wtPerc": enrichment }
 U_238 = {"Mr": 238, "wtPerc": 1-enrichment}
 U_enriched = { "Mr": None, "atPerc":1, "U-235": U_235, "U-238": U_238}
 
 UO2_enriched = { "wtPerc": 1,"density": uo2_density, "Mr": None, "U": U_enriched, "O in UO2": O_in_UO2}
 
-# input = {"UO2": UO2_enriched  } 
+input = {"UO2": UO2_enriched  } 
 
 ### helium
 He = {"Mr": 2, "atPerc": 1, "wtPerc": 1, "density": 6.33e-5}
@@ -77,7 +77,7 @@ wtPercZr = 1-wtPercNb-wtPercO
 Zr = {'Zr-90': Zr_90, 'Zr-91': Zr_91, 'Zr-92': Zr_92, 'Zr-94': Zr_94, 'Zr-96': Zr_96, 'wtPerc': wtPercZr  }
 Nb = {'Mr': 93,'wtPerc': wtPercNb}
 O = {'Mr': 16, 'wtPerc': wtPercO}
-# input = {'density': 6.52, 'Zr': Zr, 'Nb': Nb, 'O': O}
+input = {'density': 6.52, 'Zr': Zr, 'Nb': Nb, 'O': O}
 
 
 ##### Zircalloy-4 for guide thimbles #### https://www.atimaterials.com/Products/Documents/datasheets/zirconium/alloy/Zr_nuke_waste_disposal_v1.pdf, https://www.azom.com/article.aspx?ArticleID=7644
@@ -101,7 +101,6 @@ O = { "Mr": 16, "atPerc": 1}
 H = {"Mr": 1, "atPerc": 2}
 H2O = {'O': O, 'H': H, 'density' : waterDensity, 'wtPerc': 1, 'atPerc': 1}
 
-
 ## steel for RPV ### ASME A508 Grade 3   https://cdn.standards.iteh.ai/samples/28504/748d0804e90c4bc9ace68144efbd9b03/ASTM-A508-A508M-03.pdf
 steelDensity = 7.75 # generic stainless steel
 
@@ -120,4 +119,12 @@ nickel = {'Mr': 59,'wtPerc': wtPercNi}
 chromium = {'Mr': 52,'wtPerc': wtPercCr}
 molybdenum = {'Mr': 96,'wtPerc': wtPercMo}
 Fe = {'Mr': 52,  'wtPerc': balance}
-input = {'Fe': Fe,'C': carbon, 'Mn': manganese, 'Si': silicon, 'Ni': nickel, 'Cr': chromium, 'Mo': molybdenum, 'density': steelDensity}
+# input = {'Fe': Fe,'C': carbon, 'Mn': manganese, 'Si': silicon, 'Ni': nickel, 'Cr': chromium, 'Mo': molybdenum, 'density': steelDensity}
+
+if __name__=="__main__":
+
+    from nuclearDensityCalculator import results
+    file_out = 'nuclearDensityOutputs.txt'
+    x = results(input)
+    x.display()
+    x.write_results(file_out)
