@@ -44,11 +44,11 @@ def plotShannon(inputFile, outputFile):
     activeCycles = inputs.active
 
     fig, ax = plot.subplots()
-    ax.plot(shannonEntropy[:inactiveCycles + activeCycles])
+    ax.plot(shannonEntropy[:inactiveCycles])
     ax.set_ylabel('Shannon entropy')
     plot.title(str(inactiveCycles) + ' inactive cycles, ' + str(activeCycles) + ' active cycles')
     plot.tight_layout()
-    plot.savefig('Shannon_entropy')
+    plot.savefig('Shannon_entropy.svg')
 
 
 def plotScatteringMatrices(outputFile):
@@ -88,7 +88,7 @@ def plotScatteringMatrices(outputFile):
     fig.suptitle("Slab with vacuum boundaries, {} groups".format(numGroups))
     plot.tight_layout()
 
-    plot.savefig('P0_colourmap')
+    plot.savefig('P0_colourmap.svg')
 
 def plotFissionRatesMC(outputFile, normalise_plot=False, target=100):
     fissRate, fissRate_std = findFissRateMC(outputFile)
@@ -101,7 +101,7 @@ def plotFissionRatesMC(outputFile, normalise_plot=False, target=100):
     val = ax1.imshow(fissRate)
     fig.colorbar(val, ax=ax1)
     fig.suptitle('Monte Carlo fission rate')
-    plot.savefig('Fission_rate_MC')
+    plot.savefig('Fission_rate_MC.svg')
 
 def plotFluxMC(outputFile, normalise_plot=False, target=100):
     flux, flux_std = findFluxMC(outputFile)
@@ -114,7 +114,7 @@ def plotFluxMC(outputFile, normalise_plot=False, target=100):
     val = ax1.imshow(flux)
     fig.colorbar(val, ax=ax1)
     fig.suptitle('Monte Carlo flux')
-    plot.savefig('Flux_MC')
+    plot.savefig('Flux_MC.svg')
 
 def plotFissionRatesRR(outputFile, normalise_plot=False, target=100):
     # outputs = readOutputs(outputFile)
@@ -132,7 +132,7 @@ def plotFissionRatesRR(outputFile, normalise_plot=False, target=100):
     fig.colorbar(val, ax=ax1)
 
     fig.suptitle('Random ray fission rate')
-    plot.savefig('Fission_rate_RR')
+    plot.savefig('Fission_rate_RR.svg')
 
 
 def plotFissionRatesRR_radial(outputFile, normalise_plot=False, target=100):
@@ -150,7 +150,7 @@ def plotFissionRatesRR_radial(outputFile, normalise_plot=False, target=100):
     ax.set_xlabel('radius (cm)')
     ax.set_title('Fission rate against radius')
     plot.grid()
-    plot.savefig('Fission_rate_RR')
+    plot.savefig('Fission_rate_RR.svg')
 
 
 
@@ -169,18 +169,23 @@ def plotFissionRatesMC_radial(outputFile, normalise_plot=False, target=100):
     ax.set_xlabel('radius (cm)')
     ax.set_title('Fission rate against radius')
     plot.grid()
-    plot.savefig('Fission_rate_MC')
+    plot.savefig('Fission_rate_MC.svg')
 
     
 def plotFissionRatesCompareMC_RR(outputFileMC,outputFileRR, target=100):
 
     fissRateMC = normalise(findFissRateMC(outputFileMC)[0], target)
-    fissRateRR = normalise(findFissRateRR(outputFileRR)[0], target)
+    fissRateRR = normalise(findFissRateRR(outputFileRR)[0], target)   
     
     # Calculate quantities
     rel_diff = (fissRateRR - fissRateMC) / fissRateMC
+
+    # in a fuel assembly, areas with 0 fission rate cause a divide by zero error in the relative difference. This isn't an issue for plotting, but for the max error 
+    rel_diff_for_max = np.where(fissRateMC< 1e-16,0, rel_diff)
+    max_error = np.max(np.abs(rel_diff_for_max))
+
     rmse = rmsError(fissRateMC, fissRateRR, target)
-    max_error = np.max(np.abs(rel_diff))
+    # max_error = np.max(np.abs(rel_diff))
 
     # plot relative difference
     fig, ax1 = plot.subplots()
@@ -190,7 +195,7 @@ def plotFissionRatesCompareMC_RR(outputFileMC,outputFileRR, target=100):
     cb.set_label('Relative difference')
 
     fig.suptitle('(RR -MC) / MC: relative difference in fission rate.\nMax error={:.1%}, RMSE={:.2%} relative to max MC fission rate'.format(max_error, rmse))
-    plot.savefig('Fission_rate_rel_diff')
+    plot.savefig('Fission_rate_rel_diff.svg')
     return rel_diff
 
 def plotFissionRatesCompare_radial_MC_RR(outputFileMC,outputFileRR, target=100):
@@ -221,7 +226,7 @@ def plotFissionRatesCompare_radial_MC_RR(outputFileMC,outputFileRR, target=100):
     ax.set_xlabel('radius (cm)')
     plot.title('Fission rate against radius.\nMax error={:.4f}%, RMSE={:.4e}'.format(max_error, rmse))
     plot.grid()
-    plot.savefig('Relative_diff_fission_rate')
+    plot.savefig('Relative_diff_fission_rate.svg')
 
 
 def plotFluxSpectrumMC(outputFileMC):
@@ -261,7 +266,7 @@ def plotFluxSpectrumMC(outputFileMC):
         ax.set_xlabel('MeV')
         ax.set_title('{:.0f} groups, flux for {}.'.format(len(EnergyBounds_plot[0]), material))
         plot.grid()
-        plot.savefig('Flux_spectrum_' + material)
+        plot.savefig('Flux_spectrum_' + material+'.svg')
        
        
         
@@ -341,4 +346,7 @@ if __name__=='__main__':
     # plotFissionRatesCompare_radial_MC_RR('SimplePin_MC_output_radial.json', 'SimplePin_RR_output_radial.json')
     # plotFluxSpectrumMC('SimplePin_MC_output_fluxSpectrum.json')
     # plotScatteringMatrices('SimplePin_MC_output_70G_problematic.json')
-    plotFluxSpectrumMC('SimplePin_MC_output_10^8.json')
+    # plotFluxSpectrumMC('SimplePin_MC_output_10^8.json')
+    # plotShannon('SimpleSlab_MC', 'SimplePin_MC_output_10^8.json' )
+    plotFissionRatesMC('assembly_MC_output.json', 100)
+    # plotFissionRatesRR('assembly_RR_output.json', 100)
