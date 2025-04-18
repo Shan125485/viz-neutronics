@@ -258,21 +258,24 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
             ax.bar(x, capture_res, width=widths, label='capture',color='red', edgecolor='black', bottom=fission_res)
             if numGroups == 1:
                 print('\nOne energy group only')
-                ax.bar(x, np.sum(P0_corrected_res,1).flatten(), width=widths, label='scatter', color='blue', edgecolor='black', bottom=fission_res+capture_res)
+                scatter_res = np.sum(P0_corrected_res,1).flatten()
+                ax.bar(x, scatter_res, width=widths, label='scatter', color='blue', edgecolor='black', bottom=fission_res+capture_res)
                 
                 # uncertainty
                 scatter_unc_res = np.sum(P0_corrected_unc_res, 1).flatten()
 
             else:
-                ax.bar(x, np.sum(P0_corrected_res,1), width=widths, label='scatter', color='blue', edgecolor='black', bottom=fission_res+capture_res)
+                scatter_res =  np.sum(P0_corrected_res,1)
+                ax.bar(x, scatter_res, width=widths, label='scatter', color='blue', edgecolor='black', bottom=fission_res+capture_res)
                 # uncertainty
                 scatter_unc_res = np.sum(P0_corrected_unc_res, 1)
             ax.legend()
 
+            sumXS_res = capture_res + fission_res + scatter_res
 
             # uncertainty
             sumXS_unc = capture_unc_res + fission_unc_res + scatter_unc_res
-            ax.errorbar(x, total_res, yerr=sumXS_unc, fmt='none', ecolor='black', elinewidth=0.5, capsize=2)
+            ax.errorbar(x, sumXS_res, yerr=sumXS_unc, fmt='none', ecolor='black', elinewidth=0.5, capsize=2, barsabove=True)
 
             ax.set_xscale('log')
 
