@@ -185,16 +185,17 @@ def plotFissionRatesCompareMC_RR(outputFileMC,outputFileRR, target=100):
     max_error = np.max(np.abs(rel_diff_for_max))
 
     rmse = rmsError(fissRateMC, fissRateRR, target)
+    meanErr = meanError(fissRateMC, fissRateRR, target)
     # max_error = np.max(np.abs(rel_diff))
 
     # plot relative difference
     fig, ax1 = plot.subplots()
             
-    val = ax1.imshow(rel_diff)
-    cb = fig.colorbar(val, ax=ax1, format='{x:.2f}')
+    val = ax1.imshow(rel_diff, cmap='turbo')
+    cb = fig.colorbar(val, ax=ax1, format='{x:.3f}')
     cb.set_label('Relative difference')
 
-    fig.suptitle('(RR -MC) / MC: relative difference in fission rate.\nMax error={:.1%}, RMSE={:.2%} relative to max MC fission rate'.format(max_error, rmse))
+    fig.suptitle('(RR -MC) / MC: relative difference in fission rate.Max error={:.1%}, \nRMSE={:.2%}, mean error={:.2%} relative to max MC fission rate'.format(max_error, rmse, meanErr))
     plot.savefig('Fission_rate_rel_diff.svg')
     return rel_diff
 
@@ -326,10 +327,12 @@ def normalise(array, target):
 
     return array_norm
 
-def rmsError(actual_result, predicted_result, target = 100):
-    # normalise both results
-    # actual_result = normalise(actual_result, target)
-    # predicted_result = normalise(predicted_result, target)
+def rmsError(actual_result, predicted_result, target = None):
+
+    if target is not None:
+        # normalise both results
+        actual_result = normalise(actual_result, target)
+        predicted_result = normalise(predicted_result, target)
 
     # Calculate the mean squared error (MSE) by taking the mean of the squared differences
     meanSquaredError = ((predicted_result - actual_result) ** 2).mean()
@@ -337,6 +340,17 @@ def rmsError(actual_result, predicted_result, target = 100):
     # Calculate the RMSE by taking the square root of the MSE
     rmse = np.sqrt(meanSquaredError) / np.max(actual_result)
     return rmse
+
+def meanError(actual_result, predicted_result, target = None):
+
+    if target is not None:
+        # normalise both results
+        actual_result = normalise(actual_result, target)
+        predicted_result = normalise(predicted_result, target)
+
+    # Calculate the mean squared error (MSE) by taking the mean of the squared differences
+    meanError = (np.abs(predicted_result - actual_result)).mean()
+    return meanError
 
 
 if __name__=='__main__':
