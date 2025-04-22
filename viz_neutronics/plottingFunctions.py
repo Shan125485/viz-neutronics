@@ -1,6 +1,7 @@
 import json
 import numpy as np
 import matplotlib.pyplot as plot
+import os
 
 from viz_neutronics.input2json import parse_text_to_dict, save_to_json, stringTuple_to_array, dict2obj# run from outside module
 # from input2json import parse_text_to_dict, save_to_json,  dict2obj # run from within module
@@ -89,6 +90,123 @@ def plotScatteringMatrices(outputFile):
     plot.tight_layout()
 
     plot.savefig('P0_colourmap.svg')
+
+def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', response_index = 0, vmax=None, vmin=None, vmax_unc=None, vmin_unc=None):
+    """Plots quantity in Cartesian space along with the uncertainty
+
+    Args:
+        outputFileMC (str): Name of output MC file.
+        tallyName (str): Name of tally to be plotted, set by user in the MC input file.
+        normalise_by_mean (str, optional): Normalise the tally value to the mean value. Defaults to 'all'.
+                            If 'all', the mean of all values is used. 
+                            If 'non-zero', then only non-zero values are used to calculate the mean. 
+        response_index (int, optional): If multiple responses have been tallied for this clerk, use this index to specify which one to plot. Defaults to 0.
+    """
+
+    # make an output folder to store outputs
+    newpath = 'outputs'
+    if not os.path.exists(newpath):
+        os.makedirs(newpath)
+
+
+    outputs = readOutputs(outputFileMC)
+
+    result = np.array(getattr(outputs.active, tallyName).Res)
+    value = result[...,response_index,0]
+    std = result[...,response_index,1] / value
+    
+
+    # try to remove data from plot if the tally is 0
+    value_plot = np.copy(np.where(value < 1e-18, np.nan, value))
+    std_plot = np.copy(np.where(value < 1e-18, np.nan, std))
+
+    # now normalise by the mean value of non-zero tallies
+    if normalise_by_mean=='non-zero':
+        value_no_nan = value_plot[~np.isnan(value_plot)]
+        value_mean = np.mean(value_no_nan)
+        print('Normalising by the mean of non-zero values,', value_mean)
+        value_plot = value_plot / value_mean
+    elif normalise_by_mean=='all':
+        mean = np.mean(value)
+        print('Normalising by the mean of all values,', mean)
+        value_plot=value_plot/ mean
+
+    fig, (ax1, ax2) = plot.subplots(1,2)
+    # val_plot = ax1.imshow(value_plot, cmap='hot', vmax=vmax, vmin=vmin)
+    val_plot = ax1.imshow(value_plot, cmap='Blues', vmax=vmax, vmin=vmin)
+    uncertainty_plot = ax2.imshow(std_plot, cmap='hot', vmax=vmax_unc, vmin=vmin_unc)
+    fig.colorbar(val_plot, ax=ax1).minorticks_on()
+    fig.colorbar(uncertainty_plot, ax=ax2).minorticks_on()
+
+    ax1.set_title('Value \nNormalised by the mean\n of {} values'.format(normalise_by_mean))
+    ax2.set_title('Standard deviation\n(relative uncertainty)')
+
+    fig.suptitle('Monte Carlo ' + tallyName )
+  
+    plot.tight_layout()
+    plot.savefig(newpath + '/' + tallyName + '_MC.svg')
+
+def plotSpatialMaterialTallyMC(outputFileMC, tallyName, materialName, normalise_by_mean='all', response_index = 0, vmax=None, vmin=None, vmax_unc=None, vmin_unc=None):
+    """Plots quantity in Cartesian space along with the uncertainty. Works when a spacemap is defined first, then material map, in the MC input file tally.
+
+    Args:
+        outputFileMC (str): Name of output MC file.
+        tallyName (str): Name of tally to be plotted, set by user in the MC input file.
+        normalise_by_mean (str, optional): Normalise the tally value to the mean value. Defaults to 'all'.
+                            If 'all', the mean of all values is used. 
+                            If 'non-zero', then only non-zero values are used to calculate the mean. 
+        response_index (int, optional): If multiple responses have been tallied for this clerk, use this index to specify which one to plot. Defaults to 0.
+    """
+
+    # make an output folder to store outputs
+    newpath = 'outputs'
+    if not os.path.exists(newpath):
+        os.makedirs(newpath)
+
+
+    outputs = readOutputs(outputFileMC)
+    
+    # find index of material
+    MaterialBins = np.array(getattr(outputs.active, tallyName).MaterialBins)
+    mat_index = np.where(MaterialBins== materialName)
+    print(mat_index)
+
+    result = np.array(getattr(outputs.active, tallyName).Res)
+    value = result[mat_index[0],...,response_index,0][0]
+    std = result[mat_index[0],...,response_index,1][0] / value
+    
+
+    # try to remove data from plot if the tally is 0
+    value_plot = np.copy(np.where(value < 1e-18, np.nan, value))
+    std_plot = np.copy(np.where(value < 1e-18, np.nan, std))
+
+    # now normalise by the mean value of non-zero tallies
+    if normalise_by_mean=='non-zero':
+        value_no_nan = value_plot[~np.isnan(value_plot)]
+        value_mean = np.mean(value_no_nan)
+        print('Normalising by the mean of non-zero values,', value_mean)
+        value_plot = value_plot / value_mean
+    elif normalise_by_mean=='all':
+        mean = np.mean(value)
+        print('Normalising by the mean of all values,', mean)
+        value_plot=value_plot/ mean
+
+    fig, (ax1, ax2) = plot.subplots(1,2)
+    # val_plot = ax1.imshow(value_plot, cmap='hot', vmax=vmax, vmin=vmin)
+    val_plot = ax1.imshow(value_plot, cmap='Blues', vmax=vmax, vmin=vmin)
+    uncertainty_plot = ax2.imshow(std_plot, cmap='hot', vmax=vmax_unc, vmin=vmin_unc)
+    fig.colorbar(val_plot, ax=ax1).minorticks_on()
+    fig.colorbar(uncertainty_plot, ax=ax2).minorticks_on()
+
+    ax1.set_title('Value \nNormalised by the mean\n of {} values'.format(normalise_by_mean))
+    ax2.set_title('Standard deviation\n(relative uncertainty)')
+
+    fig.suptitle('Monte Carlo ' + tallyName )
+  
+    plot.tight_layout()
+    plot.savefig(newpath + '/' + tallyName + '_MC.svg')
+
+
 
 def plotFissionRatesMC(outputFile, normalise_plot=False, target=100):
     fissRate, fissRate_std = findFissRateMC(outputFile)
@@ -362,5 +480,7 @@ if __name__=='__main__':
     # plotScatteringMatrices('SimplePin_MC_output_70G_problematic.json')
     # plotFluxSpectrumMC('SimplePin_MC_output_10^8.json')
     # plotShannon('SimpleSlab_MC', 'SimplePin_MC_output_10^8.json' )
-    plotFissionRatesMC('assembly_MC_output.json', 100)
+    # plotFissionRatesMC('assembly_MC_output.json', 100)
     # plotFissionRatesRR('assembly_RR_output.json', 100)
+    # plotSpatialTallyMC('FuelAssembly_MC_output_spatial_tally.json', 'pinFissionRate', normalise_plot=False)
+    plotSpatialMaterialTallyMC('FuelAssembly_MC_output_space_and_material.json', tallyName='u238Capture', materialName='UO2-31', normalise_by_mean='all')
