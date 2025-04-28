@@ -91,7 +91,7 @@ def plotScatteringMatrices(outputFile):
 
     plot.savefig('P0_colourmap.svg')
 
-def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', response_index = 0, vmax=None, vmin=None, vmax_unc=None, vmin_unc=None):
+def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', response_index = 0, vmax=None, vmin=None, vmax_unc=None, vmin_unc=None, plotting=True, visualise_quarter=False):
     """Plots quantity in Cartesian space along with the uncertainty
 
     Args:
@@ -100,7 +100,9 @@ def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', respons
         normalise_by_mean (str, optional): Normalise the tally value to the mean value. Defaults to 'all'.
                             If 'all', the mean of all values is used. 
                             If 'non-zero', then only non-zero values are used to calculate the mean. 
+                            If None, no normalisation is applied.
         response_index (int, optional): If multiple responses have been tallied for this clerk, use this index to specify which one to plot. Defaults to 0.
+        plotting (Bool) : If True, plots and saves a figure. Otherwise just returns the values.
     """
 
     # make an output folder to store outputs
@@ -108,13 +110,40 @@ def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', respons
     if not os.path.exists(newpath):
         os.makedirs(newpath)
 
-
     outputs = readOutputs(outputFileMC)
 
     result = np.array(getattr(outputs.active, tallyName).Res)
     value = result[...,response_index,0]
     std = result[...,response_index,1] / value
-    
+
+    if visualise_quarter:
+        ## The given array only covers the top-right quarter of the fuel assembly. For visualisation, need to reflect this in the array. Need to 'mask' the central fuel pins.
+        # step 1, double the stats in the centre, and alter the relative uncertainty to reflect this
+        value[0,:] = 2 * value[0,:]
+        value[1:, 0] = 2 * value[1:, 0]
+
+        std[0,:] = std[0,:] / 2
+        std[1:, 0] = std[1:, 0] / 2
+
+        # step 2 flip and concatenate
+        value = np.concatenate([ np.flip(value, 0), value])
+        value = np.concatenate([ np.flip(value, 1), value],1)
+        std = np.concatenate([np.flip(std, 0), std])
+        std = np.concatenate([np.flip(std, 1), std],1)
+
+        # now remove the central row and column to avoid duplication
+        midindex = value.shape[0] // 2
+        value = np.delete(value, midindex, 0)
+        value = np.delete(value, midindex, 1)
+        std = np.delete(std, midindex, 0)
+        std = np.delete(std, midindex, 1)
+
+        # step 3 write a label
+        quarter_label = '(visual adjusted for quarter geometry)'
+    else:
+        quarter_label = ""
+
+
 
     # try to remove data from plot if the tally is 0
     value_plot = np.copy(np.where(value < 1e-18, np.nan, value))
@@ -130,21 +159,28 @@ def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', respons
         mean = np.mean(value)
         print('Normalising by the mean of all values,', mean)
         value_plot=value_plot/ mean
+    elif normalise_by_mean==None:
+        'No normalisation applied'
+        value_plot = value_plot
+    if plotting:
 
-    fig, (ax1, ax2) = plot.subplots(1,2)
-    # val_plot = ax1.imshow(value_plot, cmap='hot', vmax=vmax, vmin=vmin)
-    val_plot = ax1.imshow(value_plot, cmap='Blues', vmax=vmax, vmin=vmin)
-    uncertainty_plot = ax2.imshow(std_plot, cmap='hot', vmax=vmax_unc, vmin=vmin_unc)
-    fig.colorbar(val_plot, ax=ax1).minorticks_on()
-    fig.colorbar(uncertainty_plot, ax=ax2).minorticks_on()
 
-    ax1.set_title('Value \nNormalised by the mean\n of {} values'.format(normalise_by_mean))
-    ax2.set_title('Standard deviation\n(relative uncertainty)')
+        fig, (ax1, ax2) = plot.subplots(1,2)
+        # val_plot = ax1.imshow(value_plot, cmap='hot', vmax=vmax, vmin=vmin)
+        val_plot = ax1.imshow(value_plot, cmap='Blues', vmax=vmax, vmin=vmin, origin='lower')
+        uncertainty_plot = ax2.imshow(std_plot, cmap='Reds', vmax=vmax_unc, vmin=vmin_unc, origin='lower')
+        fig.colorbar(val_plot, ax=ax1).minorticks_on()
+        fig.colorbar(uncertainty_plot, ax=ax2).minorticks_on()
 
-    fig.suptitle('Monte Carlo ' + tallyName )
-  
-    plot.tight_layout()
-    plot.savefig(newpath + '/' + tallyName + '_MC.svg')
+        ax1.set_title('Value \nNormalised by the mean\n of {} values'.format(normalise_by_mean))
+        ax2.set_title('Standard deviation\n(relative uncertainty)')
+
+        fig.suptitle('Monte Carlo ' + tallyName + '\n' + quarter_label )
+    
+        plot.tight_layout()
+        plot.savefig(newpath + '/' + tallyName + '_MC.svg')
+
+    return value_plot, std_plot
 
 def plotSpatialMaterialTallyMC(outputFileMC, tallyName, materialName, normalise_by_mean='all', response_index = 0, vmax=None, vmin=None, vmax_unc=None, vmin_unc=None):
     """Plots quantity in Cartesian space along with the uncertainty. Works when a spacemap is defined first, then material map, in the MC input file tally.
@@ -155,6 +191,7 @@ def plotSpatialMaterialTallyMC(outputFileMC, tallyName, materialName, normalise_
         normalise_by_mean (str, optional): Normalise the tally value to the mean value. Defaults to 'all'.
                             If 'all', the mean of all values is used. 
                             If 'non-zero', then only non-zero values are used to calculate the mean. 
+                            If None, no normalisation is applied.
         response_index (int, optional): If multiple responses have been tallied for this clerk, use this index to specify which one to plot. Defaults to 0.
     """
 
@@ -190,11 +227,14 @@ def plotSpatialMaterialTallyMC(outputFileMC, tallyName, materialName, normalise_
         mean = np.mean(value)
         print('Normalising by the mean of all values,', mean)
         value_plot=value_plot/ mean
+    elif normalise_by_mean==None:
+        'No normalisation applied'
+        value_plot = value_plot
 
     fig, (ax1, ax2) = plot.subplots(1,2)
     # val_plot = ax1.imshow(value_plot, cmap='hot', vmax=vmax, vmin=vmin)
-    val_plot = ax1.imshow(value_plot, cmap='Blues', vmax=vmax, vmin=vmin)
-    uncertainty_plot = ax2.imshow(std_plot, cmap='hot', vmax=vmax_unc, vmin=vmin_unc)
+    val_plot = ax1.imshow(value_plot, cmap='Blues', vmax=vmax, vmin=vmin, origin='lower')
+    uncertainty_plot = ax2.imshow(std_plot, cmap='hot', vmax=vmax_unc, vmin=vmin_unc, origin='lower')
     fig.colorbar(val_plot, ax=ax1).minorticks_on()
     fig.colorbar(uncertainty_plot, ax=ax2).minorticks_on()
 
@@ -206,6 +246,193 @@ def plotSpatialMaterialTallyMC(outputFileMC, tallyName, materialName, normalise_
     plot.tight_layout()
     plot.savefig(newpath + '/' + tallyName + '_MC.svg')
 
+
+def plotSpatialTallyRR(outputFileRR, tallyName, normalise_by_mean='all', vmax=None, vmin=None, vmax_unc=None, vmin_unc=None, plotting=True, visualise_quarter=False):
+    """Plots quantity in Cartesian space along with the uncertainty
+
+    Args:
+        outputFileRR (str): Name of output RR file.
+        tallyName (str): Name of tally to be plotted, only two options - fiss1G or flux1G.
+        normalise_by_mean (str, optional): Normalise the tally value to the mean value. Defaults to 'all'.
+                            If 'all', the mean of all values is used. 
+                            If 'non-zero', then only non-zero values are used to calculate the mean. 
+                            If None, no normalisation is applied.
+        plotting (Bool) : If True, plots and saves a figure. Otherwise just returns the values.
+    """
+
+    # make an output folder to store outputs
+    newpath = 'outputs'
+    if not os.path.exists(newpath):
+        os.makedirs(newpath)
+
+
+    outputs = readOutputs(outputFileRR)
+    result = getattr(outputs, tallyName)
+    value = np.array(getattr(result, tallyName))[...,0]
+    std = np.array(getattr(result, tallyName))[...,1]  
+
+    if visualise_quarter:
+        ## The given array only covers the top-right quarter of the fuel assembly. For visualisation, need to reflect this in the array. Need to 'mask' the central fuel pins.
+        # step 1, double the stats in the centre, and alter the relative uncertainty to reflect this
+        value[0,:] = 2 * value[0,:]
+        value[1:, 0] = 2 * value[1:, 0]
+
+        std[0,:] = std[0,:] / 2
+        std[1:, 0] = std[1:, 0] / 2
+
+        # step 2 flip and concatenate
+        value = np.concatenate([ np.flip(value, 0), value])
+        value = np.concatenate([ np.flip(value, 1), value],1)
+        std = np.concatenate([np.flip(std, 0), std])
+        std = np.concatenate([np.flip(std, 1), std],1)
+
+        # now remove the central row and column to avoid duplication
+        midindex = value.shape[0] // 2
+        value = np.delete(value, midindex, 0)
+        value = np.delete(value, midindex, 1)
+        std = np.delete(std, midindex, 0)
+        std = np.delete(std, midindex, 1)
+
+        # step 3 write a label
+        quarter_label = '(visual adjusted for quarter geometry)'
+    else:
+        quarter_label = ""
+
+
+
+    # try to remove data from plot if the tally is 0
+    value_plot = np.copy(np.where(value < 1e-18, np.nan, value))
+    std_plot = np.copy(np.where(value < 1e-18, np.nan, std))
+
+    # now normalise by the mean value of non-zero tallies
+    if normalise_by_mean=='non-zero':
+        value_no_nan = value_plot[~np.isnan(value_plot)]
+        value_mean = np.mean(value_no_nan)
+        print('Normalising by the mean of non-zero values,', value_mean)
+        value_plot = value_plot / value_mean
+    elif normalise_by_mean=='all':
+        mean = np.mean(value)
+        print('Normalising by the mean of all values,', mean)
+        value_plot=value_plot/ mean
+    elif normalise_by_mean==None:
+        'No normalisation applied'
+        value_plot = value_plot
+
+    if plotting: 
+        fig, (ax1, ax2) = plot.subplots(1,2)
+        val_plot = ax1.imshow(value_plot, cmap='Blues', vmax=vmax, vmin=vmin, origin='lower')
+        uncertainty_plot = ax2.imshow(std_plot, cmap='hot', vmax=vmax_unc, vmin=vmin_unc, origin='lower')
+        fig.colorbar(val_plot, ax=ax1).minorticks_on()
+        fig.colorbar(uncertainty_plot, ax=ax2).minorticks_on()
+
+        ax1.set_title('Value \nNormalised by the mean\n of {} values'.format(normalise_by_mean))
+        ax2.set_title('Standard deviation\n(relative uncertainty)')
+
+        fig.suptitle('Random ray ' + tallyName )
+    
+        plot.tight_layout()
+        plot.savefig(newpath + '/' + tallyName + '_RR.svg')
+    return value_plot, std_plot
+
+def plotSpatialTallyCompare_MCRR(outputFileMC, outputFileRR, tallyName_MC, tallyName_RR, normalise_by_mean='all', response_index_MC = 0,  visualise_quarter=False ):
+    
+     # make an output folder to store outputs
+    newpath = 'outputs'
+    if not os.path.exists(newpath):
+        os.makedirs(newpath)
+    
+    value_MC, std_MC = plotSpatialTallyMC(outputFileMC, tallyName_MC, normalise_by_mean, response_index_MC, visualise_quarter=visualise_quarter)
+    value_RR, std_RR = plotSpatialTallyRR(outputFileRR, tallyName_RR, normalise_by_mean, visualise_quarter=visualise_quarter)
+
+    # Calculate quantities
+    rel_diff = (value_RR - value_MC) / value_MC
+    rel_diff_unc = (std_RR - std_MC) / std_MC
+
+    # calculate statistics
+    value_MC = np.copy(np.where(np.isnan(value_MC), 0, value_MC))
+    value_RR = np.copy(np.where(np.isnan(value_RR), 0, value_RR))
+
+    rel_diff_for_max = np.where(value_MC< 1e-16,0, rel_diff)    # in a fuel assembly, areas with 0 fission rate cause a divide by zero error in the relative difference. This isn't an issue for plotting, but for the max error 
+    max_error = np.max(rel_diff_for_max)
+    min_error = np.min(rel_diff_for_max)
+    max_abs_err = np.max(np.abs([max_error, min_error]))
+
+    rmse = rmsError(value_MC, value_RR)
+    meanErr = meanError(value_MC, value_RR)
+    # max_error = np.max(np.abs(rel_diff))
+
+
+
+    fig, (ax1, ax2) = plot.subplots(1,2)
+    # val_plot = ax1.imshow(value_plot, cmap='hot', vmax=vmax, vmin=vmin)
+    val_plot = ax1.imshow(rel_diff, cmap='RdBu_r', vmax=max_abs_err, vmin=-max_abs_err, origin='lower')
+
+    uncertainty_plot = ax2.imshow(rel_diff_unc, cmap='hot', origin='lower')
+    fig.colorbar(val_plot, ax=ax1).minorticks_on()
+    fig.colorbar(uncertainty_plot, ax=ax2).minorticks_on()
+
+    ax1.set_title('Value \nNormalised by the mean\n of {} values'.format(normalise_by_mean))
+    ax2.set_title('Standard deviation\n(relative uncertainty)')
+
+    fig.suptitle('(RR -MC) / MC: relative difference in {}. \nMax error={:.3%}, min error={:.3%}, \nRMSE={:.3%}, mean error={:.3%} relative to max MC {}.'.format(tallyName_MC, max_error, min_error, rmse, meanErr, tallyName_MC))
+
+    # plot.tight_layout()
+    plot.savefig(newpath + '/compare_MCRR' + tallyName_MC + '.svg')
+
+def plotSpatialTallyCompare_MCMG(outputFileCE, outputFileMG, tallyName_CE, tallyName_MG, normalise_by_mean='all', response_index_CE = 0, response_index_MG = 0,  visualise_quarter=False ):
+    """Compares the output of two Monte Carlo files, one using continuous energy and the other multigroup
+
+    Args:
+        outputFileMC (_type_): _description_
+        outputFileRR (_type_): _description_
+        tallyName_MC (_type_): _description_
+        tallyName_RR (_type_): _description_
+        normalise_by_mean (str, optional): _description_. Defaults to 'all'.
+        response_index_MC (int, optional): _description_. Defaults to 0.
+        visualise_quarter (bool, optional): _description_. Defaults to False.
+    """
+     # make an output folder to store outputs
+    newpath = 'outputs'
+    if not os.path.exists(newpath):
+        os.makedirs(newpath)
+    
+    value_CE, std_CE = plotSpatialTallyMC(outputFileCE, tallyName_CE, normalise_by_mean, response_index_CE, visualise_quarter=visualise_quarter)
+    value_MG, std_MG = plotSpatialTallyMC(outputFileMG, tallyName_MG, normalise_by_mean, response_index_MG, visualise_quarter=visualise_quarter)
+
+    # Calculate quantities
+    rel_diff = (value_MG - value_CE) / value_CE
+    rel_diff_unc = (std_MG - std_CE) / std_CE
+
+    # calculate statistics
+    value_CE = np.copy(np.where(np.isnan(value_CE), 0, value_CE))
+    value_MG = np.copy(np.where(np.isnan(value_MG), 0, value_MG))
+
+    rel_diff_for_max = np.where(value_CE< 1e-16,0, rel_diff)    # in a fuel assembly, areas with 0 fission rate cause a divide by zero error in the relative difference. This isn't an issue for plotting, but for the max error 
+    max_error = np.max(rel_diff_for_max)
+    min_error = np.min(rel_diff_for_max)
+    max_abs_err = np.max(np.abs([max_error, min_error]))
+
+    rmse = rmsError(value_CE, value_MG)
+    meanErr = meanError(value_CE, value_MG)
+    # max_error = np.max(np.abs(rel_diff))
+
+
+
+    fig, (ax1, ax2) = plot.subplots(1,2)
+    # val_plot = ax1.imshow(value_plot, cmap='hot', vmax=vmax, vmin=vmin)
+    val_plot = ax1.imshow(rel_diff, cmap='RdBu_r', vmax=max_abs_err, vmin=-max_abs_err, origin='lower')
+
+    uncertainty_plot = ax2.imshow(rel_diff_unc, cmap='hot', origin='lower')
+    fig.colorbar(val_plot, ax=ax1).minorticks_on()
+    fig.colorbar(uncertainty_plot, ax=ax2).minorticks_on()
+
+    ax1.set_title('Value \nNormalised by the mean\n of {} values'.format(normalise_by_mean))
+    ax2.set_title('Standard deviation\n(relative uncertainty)')
+
+    fig.suptitle('(MG-CE) / CE: relative difference in {}. \nMax error={:.3%}, min error={:.3%}, \nRMSE={:.3%}, mean error={:.3%} relative to max MC {}.'.format(tallyName_CE, max_error, min_error, rmse, meanErr, tallyName_CE))
+
+    # plot.tight_layout()
+    plot.savefig(newpath + '/compare_MCMG_' + tallyName_CE + '.svg')
 
 
 def plotFissionRatesMC(outputFile, normalise_plot=False, target=100):
@@ -445,7 +672,7 @@ def normalise(array, target):
 
     return array_norm
 
-def rmsError(actual_result, predicted_result, target = None):
+def rmsError(actual_result, predicted_result, target=None):
 
     if target is not None:
         # normalise both results
@@ -459,7 +686,7 @@ def rmsError(actual_result, predicted_result, target = None):
     rmse = np.sqrt(meanSquaredError) / np.max(actual_result)
     return rmse
 
-def meanError(actual_result, predicted_result, target = None):
+def meanError(actual_result, predicted_result, target=None):
 
     if target is not None:
         # normalise both results
