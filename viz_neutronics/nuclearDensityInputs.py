@@ -50,7 +50,7 @@ U_enriched = { "Mr": None, "atPerc":1, "U-235": U_235, "U-238": U_238}
 
 UO2_enriched = { "wtPerc": 1,"density": uo2_density, "Mr": None, "U": U_enriched, "O in UO2": O_in_UO2}
 
-input = {"UO2": UO2_enriched  } 
+# input = {"UO2": UO2_enriched  } 
 
 ### helium
 He = {"Mr": 2, "atPerc": 1, "wtPerc": 1, "density": 6.33e-5}
@@ -95,11 +95,28 @@ Cr = {'Mr': 52,'wtPerc': wtPercCr}
 
 
 #### water at 300C
+water_temp = 312.7 # Celsius
 
-waterDensity = 0.7
+# Calculation for water density based on fixed reference of 0.7 g/cm^3 aat 300C
+water_temp = water_temp + 273 # Kelvin
+water_temp_ref = 312.7 # Celsius
+water_temp_ref = water_temp_ref + 273 # Kelvin
+water_density_ref = 0.69811515
+
+waterDensity = water_temp_ref * water_density_ref / water_temp
+
 O = { "Mr": 16, "atPerc": 1}
 H = {"Mr": 1, "atPerc": 2}
-H2O = {'O': O, 'H': H, 'density' : waterDensity, 'wtPerc': 1, 'atPerc': 1}
+
+# ppm 
+PPM = 1175
+B_10 = {"Mr": 10, "atPerc": 20}
+B_11 = {"Mr": 11, "atPerc": 80}
+B = {"B-10": B_10, "B-11": B_11, 'wtPerc': 1175 / 1e6}
+H2O = {'O': O, 'H': H,  'wtPerc': 1, 'atPerc': 1}
+
+H2O_boronated = {'H2O': H2O, 'B': B, 'density': waterDensity}
+input = H2O_boronated
 
 ## steel for RPV ### ASME A508 Grade 3   https://cdn.standards.iteh.ai/samples/28504/748d0804e90c4bc9ace68144efbd9b03/ASTM-A508-A508M-03.pdf
 steelDensity = 7.75 # generic stainless steel

@@ -116,7 +116,7 @@ def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', respons
     value = result[...,response_index,0]
     std = result[...,response_index,1] / value
 
-    if visualise_quarter:
+    if visualise_quarter=='top-right':
         ## The given array only covers the top-right quarter of the fuel assembly. For visualisation, need to reflect this in the array. Need to 'mask' the central fuel pins.
         # step 1, double the stats in the centre, and alter the relative uncertainty to reflect this
         value[0,:] = 2 * value[0,:]
@@ -140,6 +140,33 @@ def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', respons
 
         # step 3 write a label
         quarter_label = '(visual adjusted for quarter geometry)'
+
+    elif visualise_quarter == 'bottom-right':
+        ## The given array only covers the bottom-right quarter of the fuel assembly. For visualisation, need to reflect this in the array. Need to 'mask' the central fuel pins.
+        # step 1, double the stats in the centre, and alter the relative uncertainty to reflect this
+        value[0,:] = 2 * value[0,:]
+        value[1:, 0] = 2 * value[1:, 0]
+
+        std[0,:] = std[0,:] / 2
+        std[1:, 0] = std[1:, 0] / 2
+
+        # step 2 flip and concatenate
+        value = np.concatenate([ value,np.flip(value, 0) ])
+        value = np.concatenate([ np.flip(value, 1), value],1)
+
+        std = np.concatenate([ std, np.flip(std, 0)])
+        std = np.concatenate([np.flip(std, 1), std],1)
+
+        # now remove the central row and column to avoid duplication
+        midindex = value.shape[0] // 2
+        value = np.delete(value, midindex, 0)
+        value = np.delete(value, midindex, 1)
+        std = np.delete(std, midindex, 0)
+        std = np.delete(std, midindex, 1)
+
+        # step 3 write a label
+        quarter_label = '(visual adjusted for quarter geometry)'
+
     else:
         quarter_label = ""
 
@@ -178,7 +205,9 @@ def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', respons
         fig.suptitle('Monte Carlo ' + tallyName + '\n' + quarter_label )
     
         plot.tight_layout()
+        plot.grid()
         plot.savefig(newpath + '/' + tallyName + '_MC.svg')
+        
 
     return value_plot, std_plot
 
@@ -234,7 +263,7 @@ def plotSpatialMaterialTallyMC(outputFileMC, tallyName, materialName, normalise_
     fig, (ax1, ax2) = plot.subplots(1,2)
     # val_plot = ax1.imshow(value_plot, cmap='hot', vmax=vmax, vmin=vmin)
     val_plot = ax1.imshow(value_plot, cmap='Blues', vmax=vmax, vmin=vmin, origin='lower')
-    uncertainty_plot = ax2.imshow(std_plot, cmap='hot', vmax=vmax_unc, vmin=vmin_unc, origin='lower')
+    uncertainty_plot = ax2.imshow(std_plot, cmap='Reds', vmax=vmax_unc, vmin=vmin_unc, origin='lower')
     fig.colorbar(val_plot, ax=ax1).minorticks_on()
     fig.colorbar(uncertainty_plot, ax=ax2).minorticks_on()
 
@@ -244,7 +273,7 @@ def plotSpatialMaterialTallyMC(outputFileMC, tallyName, materialName, normalise_
     fig.suptitle('Monte Carlo ' + tallyName )
   
     plot.tight_layout()
-    plot.savefig(newpath + '/' + tallyName + '_MC.svg')
+    plot.savefig(newpath + '/' + tallyName + '_' + materialName + '_MC.svg')
 
 
 def plotSpatialTallyRR(outputFileRR, tallyName, normalise_by_mean='all', vmax=None, vmin=None, vmax_unc=None, vmin_unc=None, plotting=True, visualise_quarter=False):
@@ -321,7 +350,7 @@ def plotSpatialTallyRR(outputFileRR, tallyName, normalise_by_mean='all', vmax=No
     if plotting: 
         fig, (ax1, ax2) = plot.subplots(1,2)
         val_plot = ax1.imshow(value_plot, cmap='Blues', vmax=vmax, vmin=vmin, origin='lower')
-        uncertainty_plot = ax2.imshow(std_plot, cmap='hot', vmax=vmax_unc, vmin=vmin_unc, origin='lower')
+        uncertainty_plot = ax2.imshow(std_plot, cmap='Reds', vmax=vmax_unc, vmin=vmin_unc, origin='lower')
         fig.colorbar(val_plot, ax=ax1).minorticks_on()
         fig.colorbar(uncertainty_plot, ax=ax2).minorticks_on()
 
@@ -341,8 +370,8 @@ def plotSpatialTallyCompare_MCRR(outputFileMC, outputFileRR, tallyName_MC, tally
     if not os.path.exists(newpath):
         os.makedirs(newpath)
     
-    value_MC, std_MC = plotSpatialTallyMC(outputFileMC, tallyName_MC, normalise_by_mean, response_index_MC, visualise_quarter=visualise_quarter)
-    value_RR, std_RR = plotSpatialTallyRR(outputFileRR, tallyName_RR, normalise_by_mean, visualise_quarter=visualise_quarter)
+    value_MC, std_MC = plotSpatialTallyMC(outputFileMC, tallyName_MC, normalise_by_mean, response_index_MC, visualise_quarter=visualise_quarter, plotting=False)
+    value_RR, std_RR = plotSpatialTallyRR(outputFileRR, tallyName_RR, normalise_by_mean, visualise_quarter=visualise_quarter, plotting=False)
 
     # Calculate quantities
     rel_diff = (value_RR - value_MC) / value_MC
@@ -396,8 +425,8 @@ def plotSpatialTallyCompare_MCMG(outputFileCE, outputFileMG, tallyName_CE, tally
     if not os.path.exists(newpath):
         os.makedirs(newpath)
     
-    value_CE, std_CE = plotSpatialTallyMC(outputFileCE, tallyName_CE, normalise_by_mean, response_index_CE, visualise_quarter=visualise_quarter)
-    value_MG, std_MG = plotSpatialTallyMC(outputFileMG, tallyName_MG, normalise_by_mean, response_index_MG, visualise_quarter=visualise_quarter)
+    value_CE, std_CE = plotSpatialTallyMC(outputFileCE, tallyName_CE, normalise_by_mean, response_index_CE, visualise_quarter=visualise_quarter, plotting=False)
+    value_MG, std_MG = plotSpatialTallyMC(outputFileMG, tallyName_MG, normalise_by_mean, response_index_MG, visualise_quarter=visualise_quarter, plotting=False)
 
     # Calculate quantities
     rel_diff = (value_MG - value_CE) / value_CE
@@ -414,7 +443,7 @@ def plotSpatialTallyCompare_MCMG(outputFileCE, outputFileMG, tallyName_CE, tally
 
     rmse = rmsError(value_CE, value_MG)
     meanErr = meanError(value_CE, value_MG)
-    # max_error = np.max(np.abs(rel_diff))
+ 
 
 
 
