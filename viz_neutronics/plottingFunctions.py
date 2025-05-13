@@ -171,7 +171,7 @@ def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', respons
         quarter_label = ""
 
 
-
+    ## comment
     # try to remove data from plot if the tally is 0
     value_plot = np.copy(np.where(value < 1e-18, np.nan, value))
     std_plot = np.copy(np.where(value < 1e-18, np.nan, std))
