@@ -33,3 +33,4 @@ materialsInputs/*
 # generated input and output files
 input.json
 nuclearDensityOutputs.txt
+*.json
