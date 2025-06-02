@@ -1,6 +1,33 @@
+# Author: Shan Tan-Ya, generated with the help of ChatGPT
+# Code to convert between various filetypes relevant to SCONE
+
+
+# Example workflow for reading SONCE intput files in Python:
+# text_file = 'case1_template.txt'  # replace with your filename
+# json_file = 'case1_template.json'
+
+# # Step 1: Parse the text file
+# data_dict = parse_text_to_dict(text_file)
+
+# # Step 2: Save the dictionary as a JSON file
+# save_to_json(data_dict, json_file)
+
+# # Step 3: Read the JSON file back as a dictionary to verify
+# json_data = read_json_as_dict(json_file)
+# print(json_data)
+# print(json_data.get('inactiveTally'))
+
 import re
 import json
 def parse_text_to_dict(filename):
+    """Turns the SCONE input file format into a Python-readable dictionary
+
+    Args:
+        filename (string): Path to SCONE input file
+
+    Returns:
+        dict: Dictionary containing input information in nested structure
+    """
     data_dict = {}  # Root dictionary
     with open(filename, 'r') as file:
         lines = file.readlines()
@@ -81,6 +108,14 @@ def stringTuple_to_array(stringTuple):
     return array
 
 def dict2obj(dict1):
+    """Converts a Python dictionary into a generic Python object for easier access
+
+    Args:
+        dict1 (dict): Dictionary containing information
+
+    Returns:
+        obj: An instance of a 'obj' class which contains the same information as dict1
+    """
     # declaring a class
     class obj:
         
@@ -94,17 +129,3 @@ def dict2obj(dict1):
 
 
 
-# Example usage
-# text_file = 'case1_template.txt'  # replace with your filename
-# json_file = 'case1_template.json'
-
-# # Step 1: Parse the text file
-# data_dict = parse_text_to_dict(text_file)
-
-# # Step 2: Save the dictionary as a JSON file
-# save_to_json(data_dict, json_file)
-
-# # Step 3: Read the JSON file back as a dictionary to verify
-# json_data = read_json_as_dict(json_file)
-# print(json_data)
-# print(json_data.get('inactiveTally'))
