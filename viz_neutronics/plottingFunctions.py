@@ -46,10 +46,12 @@ def plotShannon(inputFile, outputFile):
 
     fig, ax = plot.subplots()
     ax.plot(shannonEntropy[:inactiveCycles])
+
     ax.set_ylabel('Shannon entropy')
+    ax.set_xlabel('Iteration')
     plot.title(str(inactiveCycles) + ' inactive cycles, ' + str(activeCycles) + ' active cycles')
     plot.tight_layout()
-    plot.savefig('Shannon_entropy.svg')
+    plot.savefig('outputs/Shannon_entropy.svg')
 
 
 def plotScatteringMatrices(outputFile):
@@ -189,6 +191,9 @@ def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', respons
     elif normalise_by_mean==None:
         'No normalisation applied'
         value_plot = value_plot
+    
+    value_plot = np.where(np.isnan(value_plot), 0, value_plot)
+    
     if plotting:
 
 
@@ -205,10 +210,10 @@ def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', respons
         fig.suptitle('Monte Carlo ' + tallyName + '\n' + quarter_label )
     
         plot.tight_layout()
-        plot.grid()
-        plot.savefig(newpath + '/' + tallyName + '_MC.svg')
         
-
+        plot.savefig(newpath + '/' + tallyName + str(int(response_index)) + '_MC.svg')
+        
+    print('value plot MC', value_plot)
     return value_plot, std_plot
 
 def plotSpatialMaterialTallyMC(outputFileMC, tallyName, materialName, normalise_by_mean='all', response_index = 0, vmax=None, vmin=None, vmax_unc=None, vmin_unc=None):
@@ -259,6 +264,7 @@ def plotSpatialMaterialTallyMC(outputFileMC, tallyName, materialName, normalise_
     elif normalise_by_mean==None:
         'No normalisation applied'
         value_plot = value_plot
+    
 
     fig, (ax1, ax2) = plot.subplots(1,2)
     # val_plot = ax1.imshow(value_plot, cmap='hot', vmax=vmax, vmin=vmin)
@@ -333,6 +339,8 @@ def plotSpatialTallyRR(outputFileRR, tallyName, normalise_by_mean='all', vmax=No
     value_plot = np.copy(np.where(value < 1e-18, np.nan, value))
     std_plot = np.copy(np.where(value < 1e-18, np.nan, std))
 
+    
+
     # now normalise by the mean value of non-zero tallies
     if normalise_by_mean=='non-zero':
         value_no_nan = value_plot[~np.isnan(value_plot)]
@@ -346,6 +354,7 @@ def plotSpatialTallyRR(outputFileRR, tallyName, normalise_by_mean='all', vmax=No
     elif normalise_by_mean==None:
         'No normalisation applied'
         value_plot = value_plot
+    value_plot = np.where(np.isnan(value_plot), 0, value_plot)
 
     if plotting: 
         fig, (ax1, ax2) = plot.subplots(1,2)
@@ -361,6 +370,8 @@ def plotSpatialTallyRR(outputFileRR, tallyName, normalise_by_mean='all', vmax=No
     
         plot.tight_layout()
         plot.savefig(newpath + '/' + tallyName + '_RR.svg')
+        
+    
     return value_plot, std_plot
 
 def plotSpatialTallyCompare_MCRR(outputFileMC, outputFileRR, tallyName_MC, tallyName_RR, normalise_by_mean='all', response_index_MC = 0,  visualise_quarter=False ):
@@ -370,19 +381,28 @@ def plotSpatialTallyCompare_MCRR(outputFileMC, outputFileRR, tallyName_MC, tally
     if not os.path.exists(newpath):
         os.makedirs(newpath)
     
-    value_MC, std_MC = plotSpatialTallyMC(outputFileMC, tallyName_MC, normalise_by_mean, response_index_MC, visualise_quarter=visualise_quarter, plotting=False)
-    value_RR, std_RR = plotSpatialTallyRR(outputFileRR, tallyName_RR, normalise_by_mean, visualise_quarter=visualise_quarter, plotting=False)
+    value_MC, std_MC = plotSpatialTallyMC(outputFileMC, tallyName=tallyName_MC, normalise_by_mean=normalise_by_mean, response_index=response_index_MC, visualise_quarter=visualise_quarter, plotting=False)
+    value_RR, std_RR = plotSpatialTallyRR(outputFileRR, tallyName=tallyName_RR, normalise_by_mean=normalise_by_mean, visualise_quarter=visualise_quarter, plotting=True)
 
     # Calculate quantities
     rel_diff = (value_RR - value_MC) / value_MC
     rel_diff_unc = (std_RR - std_MC) / std_MC
+    print('value_MC - value_RR', value_RR)
 
     # calculate statistics
-    value_MC = np.copy(np.where(np.isnan(value_MC), 0, value_MC))
-    value_RR = np.copy(np.where(np.isnan(value_RR), 0, value_RR))
+    # value_MC = np.copy(np.where(np.isnan(value_MC), 0, value_MC))
+    # value_RR = np.copy(np.where(np.isnan(value_RR), 0, value_RR))
+    rel_diff = np.copy(np.where(np.isnan(value_MC), 0, rel_diff))       # deal with nans in the original arrays
+    rel_diff_unc = np.copy(np.where(np.isnan(value_MC), 0, rel_diff_unc))
+
+    # rel_diff = np.copy(np.where(value_MC< 1e-16, 0, rel_diff))      # deal with 0s in the original array causing divide by zero issues 
+    # rel_diff_unc = np.copy(np.where(value_MC< 1e-16, 0, rel_diff_unc))
+    
 
     rel_diff_for_max = np.where(value_MC< 1e-16,0, rel_diff)    # in a fuel assembly, areas with 0 fission rate cause a divide by zero error in the relative difference. This isn't an issue for plotting, but for the max error 
     max_error = np.max(rel_diff_for_max)
+    print('rel diff for max', rel_diff_for_max[np.where(np.isnan (rel_diff_for_max))])
+    print('rel_diff_for_max', len(rel_diff_for_max[np.where(rel_diff_for_max>0)]))
     min_error = np.min(rel_diff_for_max)
     max_abs_err = np.max(np.abs([max_error, min_error]))
 
@@ -405,7 +425,7 @@ def plotSpatialTallyCompare_MCRR(outputFileMC, outputFileRR, tallyName_MC, tally
 
     fig.suptitle('(RR -MC) / MC: relative difference in {}. \nMax error={:.3%}, min error={:.3%}, \nRMSE={:.3%}, mean error={:.3%} relative to max MC {}.'.format(tallyName_MC, max_error, min_error, rmse, meanErr, tallyName_MC))
 
-    # plot.tight_layout()
+    plot.tight_layout()
     plot.savefig(newpath + '/compare_MCRR' + tallyName_MC + '.svg')
 
 def plotSpatialTallyCompare_MCMG(outputFileCE, outputFileMG, tallyName_CE, tallyName_MG, normalise_by_mean='all', response_index_CE = 0, response_index_MG = 0,  visualise_quarter=False ):
@@ -738,5 +758,5 @@ if __name__=='__main__':
     # plotShannon('SimpleSlab_MC', 'SimplePin_MC_output_10^8.json' )
     # plotFissionRatesMC('assembly_MC_output.json', 100)
     # plotFissionRatesRR('assembly_RR_output.json', 100)
-    # plotSpatialTallyMC('FuelAssembly_MC_output_spatial_tally.json', 'pinFissionRate', normalise_plot=False)
-    plotSpatialMaterialTallyMC('FuelAssembly_MC_output_space_and_material.json', tallyName='u238Capture', materialName='UO2-31', normalise_by_mean='all')
+    plotSpatialTallyMC('FuelAssembly_MC_output_spatial_tally.json', 'pinFissionRate', response_index=0, plotting=True)
+    # plotSpatialMaterialTallyMC('FuelAssembly_MC_output_space_and_material.json', tallyName='u238Capture', materialName='UO2-31', normalise_by_mean='all')
