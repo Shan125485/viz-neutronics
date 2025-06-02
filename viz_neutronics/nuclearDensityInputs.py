@@ -77,7 +77,7 @@ wtPercZr = 1-wtPercNb-wtPercO
 Zr = {'Zr-90': Zr_90, 'Zr-91': Zr_91, 'Zr-92': Zr_92, 'Zr-94': Zr_94, 'Zr-96': Zr_96, 'wtPerc': wtPercZr  }
 Nb = {'Mr': 93,'wtPerc': wtPercNb}
 O = {'Mr': 16, 'wtPerc': wtPercO}
-input = {'density': 6.52, 'Zr': Zr, 'Nb': Nb, 'O': O}
+# input = {'density': 6.52, 'Zr': Zr, 'Nb': Nb, 'O': O}
 
 
 ##### Zircalloy-4 for guide thimbles #### https://www.atimaterials.com/Products/Documents/datasheets/zirconium/alloy/Zr_nuke_waste_disposal_v1.pdf, https://www.azom.com/article.aspx?ArticleID=7644
@@ -113,10 +113,10 @@ PPM = 1175
 B_10 = {"Mr": 10, "atPerc": 20}
 B_11 = {"Mr": 11, "atPerc": 80}
 B = {"B-10": B_10, "B-11": B_11, 'wtPerc': 1175 / 1e6}
-H2O = {'O': O, 'H': H,  'wtPerc': 1, 'atPerc': 1}
+H2O = {'O': O, 'H': H,  'wtPerc': 1}
 
 H2O_boronated = {'H2O': H2O, 'B': B, 'density': waterDensity}
-input = H2O_boronated
+#input = H2O_boronated
 
 ## steel for RPV ### ASME A508 Grade 3   https://cdn.standards.iteh.ai/samples/28504/748d0804e90c4bc9ace68144efbd9b03/ASTM-A508-A508M-03.pdf
 steelDensity = 7.75 # generic stainless steel
@@ -137,6 +137,28 @@ chromium = {'Mr': 52,'wtPerc': wtPercCr}
 molybdenum = {'Mr': 96,'wtPerc': wtPercMo}
 Fe = {'Mr': 52,  'wtPerc': balance}
 # input = {'Fe': Fe,'C': carbon, 'Mn': manganese, 'Si': silicon, 'Ni': nickel, 'Cr': chromium, 'Mo': molybdenum, 'density': steelDensity}
+
+
+########### 1D reflector inputs ####################
+# The fuel is 1/3 UO2, 2/3 water by volume
+# How does this translate to weight?
+volWater_volUO2 = 2 # ratio of water to UO2 volume, calculated from a single pin cell
+volWater = volWater_volUO2 / (1 + volWater_volUO2)  # In the pin cell, what fraction of the total area does water cover? This will correspond to the effective density of water.
+volUO2 = 1- volWater #   # In the pin cell, what fraction of the total area does UO2 cover? This will correspond to the effective density of UO2.
+# weightWater_weightUO2 = (waterDensity / uo2_density) *(volWater_volUO2) 
+# weight_water =  weightWater_weightUO2 / (1+ weightWater_weightUO2)
+# weight_UO2 = 1 - weight_water
+
+
+# UO2_in_refl_model = { "wtPerc":weight_UO2, "density": uo2_density, "Mr": None, "U": U, "O in UO2": O_in_UO2}
+# H2O_in_refl_model = {"wtPerc": weight_water, 'O': O, 'H': H,  'density': waterDensity}
+
+UO2_in_refl_model = {  "density": uo2_density, "U": U, "O in UO2": O_in_UO2,'wtPerc': volUO2 }
+H2O_in_refl_model = { 'O': O, 'H': H,  'density': waterDensity , 'wtPerc': volWater}
+
+# input = {'UO2': UO2_in_refl_model}
+input = {'H2O': H2O_in_refl_model }
+
 
 if __name__=="__main__":
 
