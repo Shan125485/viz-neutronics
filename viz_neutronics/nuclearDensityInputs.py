@@ -140,24 +140,35 @@ Fe = {'Mr': 52,  'wtPerc': balance}
 
 
 ########### 1D reflector inputs ####################
+
+### FUEL material
 # The fuel is 1/3 UO2, 2/3 water by volume
-# How does this translate to weight?
+
 volWater_volUO2 = 2 # ratio of water to UO2 volume, calculated from a single pin cell
+
 volWater = volWater_volUO2 / (1 + volWater_volUO2)  # In the pin cell, what fraction of the total area does water cover? This will correspond to the effective density of water.
 volUO2 = 1- volWater #   # In the pin cell, what fraction of the total area does UO2 cover? This will correspond to the effective density of UO2.
-# weightWater_weightUO2 = (waterDensity / uo2_density) *(volWater_volUO2) 
-# weight_water =  weightWater_weightUO2 / (1+ weightWater_weightUO2)
-# weight_UO2 = 1 - weight_water
 
-
-# UO2_in_refl_model = { "wtPerc":weight_UO2, "density": uo2_density, "Mr": None, "U": U, "O in UO2": O_in_UO2}
-# H2O_in_refl_model = {"wtPerc": weight_water, 'O': O, 'H': H,  'density': waterDensity}
 
 UO2_in_refl_model = {  "density": uo2_density, "U": U, "O in UO2": O_in_UO2,'wtPerc': volUO2 }
 H2O_in_refl_model = { 'O': O, 'H': H,  'density': waterDensity , 'wtPerc': volWater}
 
 # input = {'UO2': UO2_in_refl_model}
-input = {'H2O': H2O_in_refl_model }
+# input = {'H2O': H2O_in_refl_model }
+
+### REFLECTOR material
+
+# volSteel = 0.1  # Case 1, 10% steel (by volume)
+volSteel = 0.9  # Case 2, 90% steel (by volume)
+
+volWater = 1- volSteel
+
+H2O = {'O': O, 'H': H,  'density': volWater * waterDensity }
+steel = {'Fe': Fe,'C': carbon, 'Mn': manganese, 'Si': silicon, 'Ni': nickel, 'Cr': chromium, 'Mo': molybdenum, 'density':volSteel * steelDensity }
+
+# input = H2O
+input = steel
+
 
 
 if __name__=="__main__":
