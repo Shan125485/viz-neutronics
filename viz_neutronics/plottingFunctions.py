@@ -38,6 +38,11 @@ def readOutputs(output_file):
 
 
 def plotShannon(inputFile, outputFile):
+    # make an output folder to store outputs
+    newpath = 'outputs'
+    if not os.path.exists(newpath):
+        os.makedirs(newpath)
+    
     inputs = readInputs(inputFile)
     outputs = readOutputs(outputFile)
     shannonEntropy = outputs.inactive.shannon.shannonEntropy
@@ -51,7 +56,7 @@ def plotShannon(inputFile, outputFile):
     ax.set_xlabel('Iteration')
     plot.title(str(inactiveCycles) + ' inactive cycles, ' + str(activeCycles) + ' active cycles')
     plot.tight_layout()
-    plot.savefig('outputs/Shannon_entropy.svg')
+    plot.savefig(newpath + '/Shannon_entropy.svg')
 
 
 def plotScatteringMatrices(outputFile):
@@ -213,7 +218,7 @@ def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', respons
         
         plot.savefig(newpath + '/' + tallyName + str(int(response_index)) + '_MC.svg')
         
-    print('value plot MC', value_plot)
+
     return value_plot, std_plot
 
 def plotSpatialMaterialTallyMC(outputFileMC, tallyName, materialName, normalise_by_mean='all', response_index = 0, vmax=None, vmin=None, vmax_unc=None, vmin_unc=None):
@@ -386,8 +391,7 @@ def plotSpatialTallyCompare_MCRR(outputFileMC, outputFileRR, tallyName_MC, tally
 
     # Calculate quantities
     rel_diff = (value_RR - value_MC) / value_MC
-    rel_diff_unc = (std_RR - std_MC) / std_MC
-    print('value_MC - value_RR', value_RR)
+    rel_diff_unc = np.sqrt((std_RR/value_MC**2)**2 +(std_MC * value_RR/value_MC**2) ** 2)
 
     # calculate statistics
     # value_MC = np.copy(np.where(np.isnan(value_MC), 0, value_MC))
@@ -401,8 +405,7 @@ def plotSpatialTallyCompare_MCRR(outputFileMC, outputFileRR, tallyName_MC, tally
 
     rel_diff_for_max = np.where(value_MC< 1e-16,0, rel_diff)    # in a fuel assembly, areas with 0 fission rate cause a divide by zero error in the relative difference. This isn't an issue for plotting, but for the max error 
     max_error = np.max(rel_diff_for_max)
-    print('rel diff for max', rel_diff_for_max[np.where(np.isnan (rel_diff_for_max))])
-    print('rel_diff_for_max', len(rel_diff_for_max[np.where(rel_diff_for_max>0)]))
+
     min_error = np.min(rel_diff_for_max)
     max_abs_err = np.max(np.abs([max_error, min_error]))
 
