@@ -1,0 +1,4 @@
+A folder to store temporary inputs to the visualisation scripts.
+Doesn't need to be saved with git
+In future, I can also do live testing with actual models rather than pasting input files into this workfolder
+It is useful to store the angular distributions here though - a more permanent location should be found in future
