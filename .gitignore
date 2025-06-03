@@ -34,3 +34,6 @@ materialsInputs/*
 input.json
 nuclearDensityOutputs.txt
 *.json
+
+# a SCONE input file
+inputs/SimpleLab_MC
