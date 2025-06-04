@@ -216,8 +216,8 @@ if __name__=="__main__":
     # plot_polar_O('O-16')
     # plot_polar_H('H-1', mode='COM')
     # plot_polar_H('H-1', mode='LAB')
-    # plot_legendre('legendre')
+    plot_legendre('legendre')
     # plot_polar_energy('H-1')
     # plot_polar_energy('Fe-56')
-    plot_polar_energy('O-16')
+    # plot_polar_energy('O-16')
 
