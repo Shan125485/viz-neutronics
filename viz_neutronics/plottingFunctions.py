@@ -98,7 +98,7 @@ def plotScatteringMatrices(outputFile):
 
     plot.savefig('P0_colourmap.svg')
 
-def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', response_index = 0, vmax=None, vmin=None, vmax_unc=None, vmin_unc=None, plotting=True, visualise_quarter=False):
+def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', response_index = 0, vmax=None, vmin=None, vmax_unc=None, vmin_unc=None, plotting=True, visualise_quarter=False, aspect_ratio=1):
     """Plots quantity in Cartesian space along with the uncertainty
 
     Args:
@@ -204,8 +204,8 @@ def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', respons
 
         fig, (ax1, ax2) = plot.subplots(1,2)
         # val_plot = ax1.imshow(value_plot, cmap='hot', vmax=vmax, vmin=vmin)
-        val_plot = ax1.imshow(value_plot, cmap='Blues', vmax=vmax, vmin=vmin, origin='lower')
-        uncertainty_plot = ax2.imshow(std_plot, cmap='Reds', vmax=vmax_unc, vmin=vmin_unc, origin='lower')
+        val_plot = ax1.imshow(value_plot, cmap='Blues', vmax=vmax, vmin=vmin, origin='lower', aspect=aspect_ratio)
+        uncertainty_plot = ax2.imshow(std_plot, cmap='Reds', vmax=vmax_unc, vmin=vmin_unc, origin='lower', aspect=aspect_ratio)
         fig.colorbar(val_plot, ax=ax1).minorticks_on()
         fig.colorbar(uncertainty_plot, ax=ax2).minorticks_on()
 
@@ -287,7 +287,7 @@ def plotSpatialMaterialTallyMC(outputFileMC, tallyName, materialName, normalise_
     plot.savefig(newpath + '/' + tallyName + '_' + materialName + '_MC.svg')
 
 
-def plotSpatialTallyRR(outputFileRR, tallyName, normalise_by_mean='all', vmax=None, vmin=None, vmax_unc=None, vmin_unc=None, plotting=True, visualise_quarter=False):
+def plotSpatialTallyRR(outputFileRR, tallyName, normalise_by_mean='all', vmax=None, vmin=None, vmax_unc=None, vmin_unc=None, plotting=True, visualise_quarter=False, aspect_ratio=1):
     """Plots quantity in Cartesian space along with the uncertainty
 
     Args:
@@ -363,10 +363,19 @@ def plotSpatialTallyRR(outputFileRR, tallyName, normalise_by_mean='all', vmax=No
 
     if plotting: 
         fig, (ax1, ax2) = plot.subplots(1,2)
-        val_plot = ax1.imshow(value_plot, cmap='Blues', vmax=vmax, vmin=vmin, origin='lower')
-        uncertainty_plot = ax2.imshow(std_plot, cmap='Reds', vmax=vmax_unc, vmin=vmin_unc, origin='lower')
-        fig.colorbar(val_plot, ax=ax1).minorticks_on()
-        fig.colorbar(uncertainty_plot, ax=ax2).minorticks_on()
+
+        # check dimension:
+        if value_plot.ndim < 2:
+            # This is not 2D data, assume 1-dimensional.
+            ax1.plot(value_plot)
+            ax2.plot(std_plot)
+        
+        else:
+
+            val_plot = ax1.imshow(value_plot, cmap='Blues', vmax=vmax, vmin=vmin, origin='lower', aspect=aspect_ratio)
+            uncertainty_plot = ax2.imshow(std_plot, cmap='Reds', vmax=vmax_unc, vmin=vmin_unc, origin='lower', aspect=aspect_ratio)
+            fig.colorbar(val_plot, ax=ax1).minorticks_on()
+            fig.colorbar(uncertainty_plot, ax=ax2).minorticks_on()
 
         ax1.set_title('Value \nNormalised by the mean\n of {} values'.format(normalise_by_mean))
         ax2.set_title('Standard deviation\n(relative uncertainty)')
@@ -374,12 +383,12 @@ def plotSpatialTallyRR(outputFileRR, tallyName, normalise_by_mean='all', vmax=No
         fig.suptitle('Random ray ' + tallyName )
     
         plot.tight_layout()
-        plot.savefig(newpath + '/' + tallyName + '_RR.svg')
+        plot.savefig(newpath + '/' + tallyName + '_RR_' + tallyName + '.svg')
         
     
     return value_plot, std_plot
 
-def plotSpatialTallyCompare_MCRR(outputFileMC, outputFileRR, tallyName_MC, tallyName_RR, normalise_by_mean='all', response_index_MC = 0,  visualise_quarter=False ):
+def plotSpatialTallyCompare_MCRR(outputFileMC, outputFileRR, tallyName_MC, tallyName_RR, normalise_by_mean='all', response_index_MC = 0,  visualise_quarter=False, aspect_ratio=1 ):
     
      # make an output folder to store outputs
     newpath = 'outputs'
@@ -417,9 +426,9 @@ def plotSpatialTallyCompare_MCRR(outputFileMC, outputFileRR, tallyName_MC, tally
 
     fig, (ax1, ax2) = plot.subplots(1,2)
     # val_plot = ax1.imshow(value_plot, cmap='hot', vmax=vmax, vmin=vmin)
-    val_plot = ax1.imshow(rel_diff, cmap='RdBu_r', vmax=max_abs_err, vmin=-max_abs_err, origin='lower')
+    val_plot = ax1.imshow(rel_diff, cmap='RdBu_r', vmax=max_abs_err, vmin=-max_abs_err, origin='lower', aspect=aspect_ratio)
 
-    uncertainty_plot = ax2.imshow(rel_diff_unc, cmap='hot', origin='lower')
+    uncertainty_plot = ax2.imshow(rel_diff_unc, cmap='hot', origin='lower', aspect=aspect_ratio)
     fig.colorbar(val_plot, ax=ax1).minorticks_on()
     fig.colorbar(uncertainty_plot, ax=ax2).minorticks_on()
 
