@@ -98,7 +98,7 @@ def plotScatteringMatrices(outputFile):
 
     plot.savefig('P0_colourmap.svg')
 
-def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', response_index = 0, vmax=None, vmin=None, vmax_unc=None, vmin_unc=None, plotting=True, visualise_quarter=False, aspect_ratio=1):
+def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', response_index = 0, vmax=None, vmin=None, vmax_unc=None, vmin_unc=None, plotting=True, visualise_quarter=False, aspect_ratio=1, layout = 'horizontal'):
     """Plots quantity in Cartesian space along with the uncertainty
 
     Args:
@@ -122,6 +122,7 @@ def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', respons
     result = np.array(getattr(outputs.active, tallyName).Res)
     value = result[...,response_index,0]
     std = result[...,response_index,1] / value
+
 
     if visualise_quarter=='top-right':
         ## The given array only covers the top-right quarter of the fuel assembly. For visualisation, need to reflect this in the array. Need to 'mask' the central fuel pins.
@@ -177,8 +178,6 @@ def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', respons
     else:
         quarter_label = ""
 
-
-    ## comment
     # try to remove data from plot if the tally is 0
     value_plot = np.copy(np.where(value < 1e-18, np.nan, value))
     std_plot = np.copy(np.where(value < 1e-18, np.nan, std))
@@ -196,18 +195,38 @@ def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', respons
     elif normalise_by_mean==None:
         'No normalisation applied'
         value_plot = value_plot
-    
+
+    # Turn NaNs back into 0s for plotting    
     value_plot = np.where(np.isnan(value_plot), 0, value_plot)
+    std_plot = np.where(np.isnan(std_plot), 0, std_plot)
     
     if plotting:
+        if layout == 'horizontal':
+            fig, (ax1, ax2) = plot.subplots(1,2)
+        elif layout == 'vertical':
+            fig, (ax1, ax2) = plot.subplots(2,1)
+        
+        if value_plot.ndim < 2:
 
+            print(value_plot.shape)
+            print(std_plot[-10:])
+            # This is not 2D data, assume 1-dimensional.
+            ax1.plot(value_plot)
+            ax2.plot(std_plot)
 
-        fig, (ax1, ax2) = plot.subplots(1,2)
-        # val_plot = ax1.imshow(value_plot, cmap='hot', vmax=vmax, vmin=vmin)
-        val_plot = ax1.imshow(value_plot, cmap='Blues', vmax=vmax, vmin=vmin, origin='lower', aspect=aspect_ratio)
-        uncertainty_plot = ax2.imshow(std_plot, cmap='Reds', vmax=vmax_unc, vmin=vmin_unc, origin='lower', aspect=aspect_ratio)
-        fig.colorbar(val_plot, ax=ax1).minorticks_on()
-        fig.colorbar(uncertainty_plot, ax=ax2).minorticks_on()
+            ax1.set_xlim(left=0)
+            ax2.set_xlim(left=0)
+
+            ax1.grid()
+            ax2.grid()
+
+        else:
+
+            # val_plot = ax1.imshow(value_plot, cmap='hot', vmax=vmax, vmin=vmin)
+            val_plot = ax1.imshow(value_plot, cmap='Blues', vmax=vmax, vmin=vmin, origin='lower', aspect=aspect_ratio)
+            uncertainty_plot = ax2.imshow(std_plot, cmap='Reds', vmax=vmax_unc, vmin=vmin_unc, origin='lower', aspect=aspect_ratio)
+            fig.colorbar(val_plot, ax=ax1).minorticks_on()
+            fig.colorbar(uncertainty_plot, ax=ax2).minorticks_on()
 
         ax1.set_title('Value \nNormalised by the mean\n of {} values'.format(normalise_by_mean))
         ax2.set_title('Standard deviation\n(relative uncertainty)')
@@ -270,6 +289,10 @@ def plotSpatialMaterialTallyMC(outputFileMC, tallyName, materialName, normalise_
         'No normalisation applied'
         value_plot = value_plot
     
+    # Turn NaNs back into 0s for plotting    
+    value_plot = np.where(np.isnan(value_plot), 0, value_plot)
+    std_plot = np.where(np.isnan(std_plot), 0, std_plot)
+    
 
     fig, (ax1, ax2) = plot.subplots(1,2)
     # val_plot = ax1.imshow(value_plot, cmap='hot', vmax=vmax, vmin=vmin)
@@ -287,7 +310,7 @@ def plotSpatialMaterialTallyMC(outputFileMC, tallyName, materialName, normalise_
     plot.savefig(newpath + '/' + tallyName + '_' + materialName + '_MC.svg')
 
 
-def plotSpatialTallyRR(outputFileRR, tallyName, normalise_by_mean='all', vmax=None, vmin=None, vmax_unc=None, vmin_unc=None, plotting=True, visualise_quarter=False, aspect_ratio=1):
+def plotSpatialTallyRR(outputFileRR, tallyName, normalise_by_mean='all', vmax=None, vmin=None, vmax_unc=None, vmin_unc=None, plotting=True, visualise_quarter=False, aspect_ratio=1, layout='horizontal'):
     """Plots quantity in Cartesian space along with the uncertainty
 
     Args:
@@ -361,14 +384,24 @@ def plotSpatialTallyRR(outputFileRR, tallyName, normalise_by_mean='all', vmax=No
         value_plot = value_plot
     value_plot = np.where(np.isnan(value_plot), 0, value_plot)
 
+    # Turn NaNs back into 0s for plotting    
+    value_plot = np.where(np.isnan(value_plot), 0, value_plot)
+    std_plot = np.where(np.isnan(std_plot), 0, std_plot)
+
+
     if plotting: 
-        fig, (ax1, ax2) = plot.subplots(1,2)
+        if layout == 'horizontal':
+            fig, (ax1, ax2) = plot.subplots(1,2)
+        elif layout == 'vertical':
+            fig, (ax1, ax2) = plot.subplots(2,1)
 
         # check dimension:
         if value_plot.ndim < 2:
             # This is not 2D data, assume 1-dimensional.
             ax1.plot(value_plot)
             ax2.plot(std_plot)
+            ax1.grid()
+            ax2.grid()
         
         else:
 
@@ -388,7 +421,7 @@ def plotSpatialTallyRR(outputFileRR, tallyName, normalise_by_mean='all', vmax=No
     
     return value_plot, std_plot
 
-def plotSpatialTallyCompare_MCRR(outputFileMC, outputFileRR, tallyName_MC, tallyName_RR, normalise_by_mean='all', response_index_MC = 0,  visualise_quarter=False, aspect_ratio=1 ):
+def plotSpatialTallyCompare_MCRR(outputFileMC, outputFileRR, tallyName_MC, tallyName_RR, normalise_by_mean='all', response_index_MC = 0, plotting=True, visualise_quarter=False, aspect_ratio=1, layout = 'horizontal'):
     
      # make an output folder to store outputs
     newpath = 'outputs'
@@ -396,7 +429,7 @@ def plotSpatialTallyCompare_MCRR(outputFileMC, outputFileRR, tallyName_MC, tally
         os.makedirs(newpath)
     
     value_MC, std_MC = plotSpatialTallyMC(outputFileMC, tallyName=tallyName_MC, normalise_by_mean=normalise_by_mean, response_index=response_index_MC, visualise_quarter=visualise_quarter, plotting=False)
-    value_RR, std_RR = plotSpatialTallyRR(outputFileRR, tallyName=tallyName_RR, normalise_by_mean=normalise_by_mean, visualise_quarter=visualise_quarter, plotting=True)
+    value_RR, std_RR = plotSpatialTallyRR(outputFileRR, tallyName=tallyName_RR, normalise_by_mean=normalise_by_mean, visualise_quarter=visualise_quarter, plotting=False)
 
     # Calculate quantities
     rel_diff = (value_RR - value_MC) / value_MC
@@ -422,23 +455,49 @@ def plotSpatialTallyCompare_MCRR(outputFileMC, outputFileRR, tallyName_MC, tally
     meanErr = meanError(value_MC, value_RR)
     # max_error = np.max(np.abs(rel_diff))
 
+    # Turn NaNs back into 0s for plotting    
+    rel_diff = np.where(np.isnan(rel_diff), 0, rel_diff)
+    rel_diff_unc = np.where(np.isnan(rel_diff_unc), 0, rel_diff_unc)
 
+    if plotting:
+        if layout == 'horizontal':
+            fig, (ax1, ax2) = plot.subplots(1,2)
+        elif layout == 'vertical':
+            fig, (ax1, ax2) = plot.subplots(2,1)
+        # check dimension:
+        if rel_diff.ndim < 2:
+            # This is not 2D data, assume 1-dimensional.
+            ax1.plot(rel_diff)
+            ax2.plot(rel_diff_unc)
 
-    fig, (ax1, ax2) = plot.subplots(1,2)
-    # val_plot = ax1.imshow(value_plot, cmap='hot', vmax=vmax, vmin=vmin)
-    val_plot = ax1.imshow(rel_diff, cmap='RdBu_r', vmax=max_abs_err, vmin=-max_abs_err, origin='lower', aspect=aspect_ratio)
+            # Display values in % ... Didn't work well
+            # ax1.set_yticklabels([f'{x:.2f}%' for x in ax1.get_yticks() * 100])
+            # ax2.set_yticklabels([f'{x:.2f}%' for x in ax2.get_yticks() * 100])
 
-    uncertainty_plot = ax2.imshow(rel_diff_unc, cmap='hot', origin='lower', aspect=aspect_ratio)
-    fig.colorbar(val_plot, ax=ax1).minorticks_on()
-    fig.colorbar(uncertainty_plot, ax=ax2).minorticks_on()
+            # put x axis at y=0
+            ax1.spines['bottom'].set_position(('data', 0.0000))
+            ax2.spines['bottom'].set_position(('data', 0.0000))
 
-    ax1.set_title('Value \nNormalised by the mean\n of {} values'.format(normalise_by_mean))
-    ax2.set_title('Standard deviation\n(relative uncertainty)')
+            ax1.set_xlim(left=0)
+            ax2.set_xlim(left=0)
+        
+        else:
+            val_plot = ax1.imshow(rel_diff, cmap='RdBu_r', vmax=max_abs_err, vmin=-max_abs_err, origin='lower', aspect=aspect_ratio)
 
-    fig.suptitle('(RR -MC) / MC: relative difference in {}. \nMax error={:.3%}, min error={:.3%}, \nRMSE={:.3%}, mean error={:.3%} relative to max MC {}.'.format(tallyName_MC, max_error, min_error, rmse, meanErr, tallyName_MC))
+            uncertainty_plot = ax2.imshow(rel_diff_unc, cmap='Reds', origin='lower', aspect=aspect_ratio)
+            fig.colorbar(val_plot, ax=ax1).minorticks_on()
+            fig.colorbar(uncertainty_plot, ax=ax2).minorticks_on()
 
-    plot.tight_layout()
-    plot.savefig(newpath + '/compare_MCRR' + tallyName_MC + '.svg')
+        ax1.set_title('Value \nNormalised by the mean\n of {} values'.format(normalise_by_mean))
+        ax2.set_title('Standard deviation\n(relative uncertainty)')
+
+        ax1.grid()
+        ax2.grid()
+
+        fig.suptitle('(RR -MC) / MC: relative difference in {}. \nMax error={:.3%}, min error={:.3%}, \nRMSE={:.3%}, mean error={:.3%} relative to max MC {}.'.format(tallyName_RR, max_error, min_error, rmse, meanErr, tallyName_MC))
+
+        plot.tight_layout()
+        plot.savefig(newpath + '/compare_MCRR' + tallyName_RR + '.svg')
 
 def plotSpatialTallyCompare_MCMG(outputFileCE, outputFileMG, tallyName_CE, tallyName_MG, normalise_by_mean='all', response_index_CE = 0, response_index_MG = 0,  visualise_quarter=False ):
     """Compares the output of two Monte Carlo files, one using continuous energy and the other multigroup
