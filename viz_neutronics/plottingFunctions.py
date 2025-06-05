@@ -207,12 +207,9 @@ def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', respons
             fig, (ax1, ax2) = plot.subplots(2,1)
         
         if value_plot.ndim < 2:
-
-            print(value_plot.shape)
-            print(std_plot[-10:])
             # This is not 2D data, assume 1-dimensional.
-            ax1.plot(value_plot)
-            ax2.plot(std_plot)
+            ax1.plot(value_plot, color='blue')
+            ax2.plot(std_plot, color='red')
 
             ax1.set_xlim(left=0)
             ax2.set_xlim(left=0)
@@ -398,8 +395,8 @@ def plotSpatialTallyRR(outputFileRR, tallyName, normalise_by_mean='all', vmax=No
         # check dimension:
         if value_plot.ndim < 2:
             # This is not 2D data, assume 1-dimensional.
-            ax1.plot(value_plot)
-            ax2.plot(std_plot)
+            ax1.plot(value_plot, color='blue')
+            ax2.plot(std_plot,color='red')
             ax1.grid()
             ax2.grid()
         
@@ -421,8 +418,28 @@ def plotSpatialTallyRR(outputFileRR, tallyName, normalise_by_mean='all', vmax=No
     
     return value_plot, std_plot
 
-def plotSpatialTallyCompare_MCRR(outputFileMC, outputFileRR, tallyName_MC, tallyName_RR, normalise_by_mean='all', response_index_MC = 0, plotting=True, visualise_quarter=False, aspect_ratio=1, layout = 'horizontal'):
-    
+def plotSpatialTallyCompare_MCRR(outputFileMC, outputFileRR, tallyName_MC, tallyName_RR, normalise_by_mean='all', response_index_MC = 0, plotting=True, visualise_quarter=False, aspect_ratio=1, layout = 'horizontal', sideByside=False):
+    """Plot which compares a Monte Carlo and random ray output.
+
+    Args:
+        outputFileMC (str): Monte Carlo output filepath
+        outputFileRR (str): Random ray output filepath
+        tallyName_MC (str): The tally name in the Monte Carlo file
+        tallyName_RR (str): The tally name in the random ray file
+        normalise_by_mean (str, optional): Normalise the tally value to the mean value. Defaults to 'all'.
+                            If 'all', the mean of all values is used. 
+                            If 'non-zero', then only non-zero values are used to calculate the mean. 
+                            If None, no normalisation is applied. 
+        response_index_MC (int, optional): If multiple responses have been tallied for this clerk, use this index to specify which one to plot. Defaults to 0.
+        plotting (bool, optional): If True, plots and saves a figure. Otherwise just returns the values. Defaults to True.
+        visualise_quarter (bool or str, optional): Defaults to False.If False, plot normally. Otherwise displays plot reflected in both y and x axes, according to the string:
+                            Could be ['top-left', 'top-right', 'bottom-left', 'bottom-right'].
+        aspect_ratio (int, optional): The ratio of y pixels vs x pixels when displayed. Defaults to 1.
+        layout (str, optional): Determines whether value plot and uncertainty plot are adjacent horizontally ('horizontal') or vertically ('vertical). 
+                                Defaults to 'horizontal'.
+        sideByside (bool, optional): For a 1D plot only. If 1D plot is detected, and this is True, then instead of plotting the relative difference, plots the values themselves on the same axes.
+                                Defaults to False.
+    """
      # make an output folder to store outputs
     newpath = 'outputs'
     if not os.path.exists(newpath):
@@ -436,14 +453,9 @@ def plotSpatialTallyCompare_MCRR(outputFileMC, outputFileRR, tallyName_MC, tally
     rel_diff_unc = np.sqrt((std_RR/value_MC**2)**2 +(std_MC * value_RR/value_MC**2) ** 2)
 
     # calculate statistics
-    # value_MC = np.copy(np.where(np.isnan(value_MC), 0, value_MC))
-    # value_RR = np.copy(np.where(np.isnan(value_RR), 0, value_RR))
+
     rel_diff = np.copy(np.where(np.isnan(value_MC), 0, rel_diff))       # deal with nans in the original arrays
     rel_diff_unc = np.copy(np.where(np.isnan(value_MC), 0, rel_diff_unc))
-
-    # rel_diff = np.copy(np.where(value_MC< 1e-16, 0, rel_diff))      # deal with 0s in the original array causing divide by zero issues 
-    # rel_diff_unc = np.copy(np.where(value_MC< 1e-16, 0, rel_diff_unc))
-    
 
     rel_diff_for_max = np.where(value_MC< 1e-16,0, rel_diff)    # in a fuel assembly, areas with 0 fission rate cause a divide by zero error in the relative difference. This isn't an issue for plotting, but for the max error 
     max_error = np.max(rel_diff_for_max)
@@ -467,12 +479,26 @@ def plotSpatialTallyCompare_MCRR(outputFileMC, outputFileRR, tallyName_MC, tally
         # check dimension:
         if rel_diff.ndim < 2:
             # This is not 2D data, assume 1-dimensional.
-            ax1.plot(rel_diff)
-            ax2.plot(rel_diff_unc)
 
-            # Display values in % ... Didn't work well
-            # ax1.set_yticklabels([f'{x:.2f}%' for x in ax1.get_yticks() * 100])
-            # ax2.set_yticklabels([f'{x:.2f}%' for x in ax2.get_yticks() * 100])
+            # May need to plot the values themselves rather than the difference for a 'side-by'side' comparison
+            if sideByside:
+                ax1.plot(value_MC, color='black', linestyle='dashed', label='MC')
+                ax1.plot(value_RR, color='green', label='RR')
+
+                ax2.plot(std_MC, color='black',linestyle='dashed')
+                ax2.plot(std_RR, color='green')
+
+                ax1.set_ylabel(tallyName_RR)
+                ax2.set_ylabel('standard deviation')
+                plot.figlegend()
+
+            elif sideByside== False:
+                ax1.plot(rel_diff, color='blue')
+                ax2.plot(rel_diff_unc, color='red')
+
+                ax1.set_ylabel('Relative diff')
+                ax2.set_ylabel('Combine uncertainty')       
+
 
             # put x axis at y=0
             ax1.spines['bottom'].set_position(('data', 0.0000))
@@ -480,6 +506,8 @@ def plotSpatialTallyCompare_MCRR(outputFileMC, outputFileRR, tallyName_MC, tally
 
             ax1.set_xlim(left=0)
             ax2.set_xlim(left=0)
+
+            
         
         else:
             val_plot = ax1.imshow(rel_diff, cmap='RdBu_r', vmax=max_abs_err, vmin=-max_abs_err, origin='lower', aspect=aspect_ratio)
