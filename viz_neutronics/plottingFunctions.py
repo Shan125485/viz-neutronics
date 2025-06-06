@@ -418,7 +418,7 @@ def plotSpatialTallyRR(outputFileRR, tallyName, normalise_by_mean='all', vmax=No
     
     return value_plot, std_plot
 
-def plotSpatialTallyCompare_MCRR(outputFileMC, outputFileRR, tallyName_MC, tallyName_RR, normalise_by_mean='all', response_index_MC = 0, plotting=True, visualise_quarter=False, aspect_ratio=1, layout = 'horizontal', sideByside=False):
+def plotSpatialTallyCompare_MCRR(outputFileMC, outputFileRR, tallyName_MC, tallyName_RR, normalise_by_mean='all', response_index_MC = 0, plotting=True, visualise_quarter=False, aspect_ratio=1, layout = 'horizontal', sideByside=False, i=0, j=None):
     """Plot which compares a Monte Carlo and random ray output.
 
     Args:
@@ -439,6 +439,7 @@ def plotSpatialTallyCompare_MCRR(outputFileMC, outputFileRR, tallyName_MC, tally
                                 Defaults to 'horizontal'.
         sideByside (bool, optional): For a 1D plot only. If 1D plot is detected, and this is True, then instead of plotting the relative difference, plots the values themselves on the same axes.
                                 Defaults to False.
+        i (int, optional): Starting index for slicing a 1D output array. Defaults to 0.
     """
      # make an output folder to store outputs
     newpath = 'outputs'
@@ -454,17 +455,17 @@ def plotSpatialTallyCompare_MCRR(outputFileMC, outputFileRR, tallyName_MC, tally
 
     # calculate statistics
 
-    rel_diff = np.copy(np.where(np.isnan(value_MC), 0, rel_diff))       # deal with nans in the original arrays
-    rel_diff_unc = np.copy(np.where(np.isnan(value_MC), 0, rel_diff_unc))
+    rel_diff = np.copy(np.where(np.isnan(value_MC), 0, rel_diff))[i:j]    # deal with nans in the original arrays
+    rel_diff_unc = np.copy(np.where(np.isnan(value_MC), 0, rel_diff_unc))[i:j]
 
-    rel_diff_for_max = np.where(value_MC< 1e-16,0, rel_diff)    # in a fuel assembly, areas with 0 fission rate cause a divide by zero error in the relative difference. This isn't an issue for plotting, but for the max error 
+    rel_diff_for_max = np.where(value_MC[i:j]< 1e-16,0, rel_diff)    # in a fuel assembly, areas with 0 fission rate cause a divide by zero error in the relative difference. This isn't an issue for plotting, but for the max error 
     max_error = np.max(rel_diff_for_max)
 
     min_error = np.min(rel_diff_for_max)
     max_abs_err = np.max(np.abs([max_error, min_error]))
 
-    rmse = rmsError(value_MC, value_RR)
-    meanErr = meanError(value_MC, value_RR)
+    rmse = rmsError(value_MC[i:j], value_RR[i:j])
+    meanErr = meanError(value_MC[i:j], value_RR[i:j])
     # max_error = np.max(np.abs(rel_diff))
 
     # Turn NaNs back into 0s for plotting    
