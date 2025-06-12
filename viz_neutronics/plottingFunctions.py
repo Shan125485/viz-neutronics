@@ -1,11 +1,18 @@
 import json
 import numpy as np
 import matplotlib.pyplot as plot
+from itertools import cycle
 import os
 
 from viz_neutronics.input2json import parse_text_to_dict, save_to_json, stringTuple_to_array, dict2obj# run from outside module
 # from input2json import parse_text_to_dict, save_to_json,  dict2obj # run from within module
 
+
+# variables
+lines = ["-","--","-.",":"]
+colours = ['royalblue', 'orange', 'forestgreen', 'firebrick', 'goldenrod', 'darkviolet']
+linecycler = cycle(lines)
+colourcycler = cycle(colours)
 
 
 def readInputs(inputFile): 
@@ -97,6 +104,210 @@ def plotScatteringMatrices(outputFile):
     plot.tight_layout()
 
     plot.savefig('P0_colourmap.svg')
+
+
+def plotCellPosRR(outputFileRR):
+    """Plots the cell positions in the random ray output file. Useful for debugging.
+
+    Args:
+        outputFileRR (str): Name of the random ray output file.
+    """
+    outputs = readOutputs(outputFileRR)
+    cellPos = np.array(outputs.position.position)
+    print(cellPos[:,2].shape)
+    fig, (axx, axy, axz) = plot.subplots(3,1)
+    # ax.plot(cellPos[:,0], cellPos[:,1], 'o', markersize=1)
+    i=11
+    counter = np.arange(cellPos.shape[0]-i)
+    
+    axx.scatter(counter,cellPos[i:,0])
+    axy.scatter(counter,cellPos[i:,1])
+    axz.scatter(counter,cellPos[i:,2])
+    # ax1.scatter(cellPos[:,2],cellPos[:,1])
+    # ax.set_xlabel('x position')
+    axx.set_ylabel('x position')
+    axy.set_ylabel('y position')
+    axz.set_ylabel('z position')
+    fig.suptitle('Cell positions in random ray output file')
+    plot.tight_layout()
+    plot.savefig('outputs/cell_positions.svg')
+
+def plotDirectionalFluxRR(outputFileRR, direction):
+    """Plots the right or left flux in the random ray output file. Useful for debugging.
+
+    Args:
+        outputFileRR (str): Name of the random ray output file.
+    """
+    if direction not in ['left', 'right']:
+        raise ValueError("Direction must be either 'left' or 'right'.")
+    if direction == 'right':
+        outputs = readOutputs(outputFileRR)
+        rightflux = np.array(outputs.right_flux.right_flux_g1)
+        print('right flux shape:', rightflux.shape)
+
+        fig, (ax_val, ax_std) = plot.subplots(2)
+        ax_val.plot(rightflux[:,0])
+        ax_std.plot(rightflux[:,1])
+        ax_val.set_title('value')
+        ax_std.set_title('std')
+
+        fig.suptitle('right flux in random ray')
+        plot.tight_layout()
+        plot.savefig('outputs/right_flux.svg')
+    elif direction == 'left':
+        outputs = readOutputs(outputFileRR)
+        leftflux = np.array(outputs.left_flux.left_flux_g1)
+        print('left flux shape:', leftflux.shape)
+
+        fig, (ax_val, ax_std) = plot.subplots(2)
+        ax_val.plot(leftflux[:,0])
+        ax_std.plot(leftflux[:,1])
+        ax_val.set_title('value')
+        ax_std.set_title('std')
+
+        fig.suptitle('left flux in random ray')
+        plot.tight_layout()
+        plot.savefig('outputs/left_flux.svg')
+
+def plotMultiMapTallyMC(outputFileMC, tallyName,response_index = 0, normalise_by_mean='all', plotting=True, mapOrder = [1,2,3], layout = 'horizontal', mode = 'line', aspect_ratio = 1):
+    """Tries to plot up to three dimensions. mapOrder corresponds to the level of plotting. Dimension 1 is the x axis of line plots. 
+    Dimension 2 will be lines shown on the same axes. Dimension 3 will define a new set of axes.
+
+    Args:
+        outputFileMC (_type_): _description_
+        tallyName (_type_): _description_
+        response_index (int, optional): _description_. Defaults to 0.
+        normalise_by_mean (str, optional): _description_. Defaults to 'all'.
+        plotting (bool, optional): _description_. Defaults to True.
+        mapOrder (list, optional): _description_. Defaults to [''].
+    """
+    # make an output folder to store outputs
+    newpath = 'outputs'
+    if not os.path.exists(newpath):
+        os.makedirs(newpath)
+
+    outputs = readOutputs(outputFileMC)
+
+    result = np.array(getattr(outputs.active, tallyName).Res)
+    mapNames = np.array(getattr(outputs.active, tallyName).multiMapOrder)
+    value = result[...,response_index,0]
+    std = result[...,response_index,1] / value
+
+    # try to remove data from plot if the tally is 0
+    value_plot = np.copy(np.where(value < 1e-18, np.nan, value))
+    std_plot = np.copy(np.where(value < 1e-18, np.nan, std))
+
+    # now normalise by the mean value of non-zero tallies
+    if normalise_by_mean=='non-zero':
+        value_no_nan = value_plot[~np.isnan(value_plot)]
+        value_mean = np.mean(value_no_nan)
+        print('Normalising by the mean of non-zero values,', value_mean)
+        value_plot = value_plot / value_mean
+    elif normalise_by_mean=='all':
+        mean = np.mean(value)
+        print('Normalising by the mean of all values,', mean)
+        value_plot=value_plot/ mean
+    elif normalise_by_mean==None:
+        'No normalisation applied'
+        value_plot = value_plot
+
+    # Turn NaNs back into 0s for plotting    
+    value_plot = np.where(np.isnan(value_plot), 0, value_plot)
+    std_plot = np.where(np.isnan(std_plot), 0, std_plot)
+    
+    if plotting:
+        mapOrder = np.array(mapOrder)
+        # reshape the array according to the user input. First index defines the number of figures, 2nd index the number of traces, 3rd index the length of x axis.
+        value_plot = np.moveaxis(value_plot, [0,1,2], mapOrder)
+        std_plot = np.moveaxis(std_plot, [0,1,2], mapOrder)
+        mapNames = np.flip(mapNames)[mapOrder]
+
+        num_figs = value_plot.shape[0]
+        num_traces = value_plot.shape[1]
+
+        if mode == 'line':
+            for i in range(0, num_figs):
+                print('Plotting figure {:.0f} of {:.0f}'.format(i+1, num_figs))
+                if layout == 'horizontal':
+                    fig, (ax1, ax2) = plot.subplots(1,2)
+                elif layout == 'vertical':
+                    fig, (ax1, ax2) = plot.subplots(2,1)
+                
+                for j in range(0, num_traces):
+                    style = next(linecycler)
+                    colour = next(colourcycler)
+                    print('-> Plotting trace {:.0f} of {:.0f}'.format(j+1, num_traces))
+                    ax1.plot(value_plot[i,j], label=j+1, linestyle=style, color=colour)
+                    ax2.plot(std_plot[i,j], linestyle=style, color=colour)
+
+                ax1.set_xlim(left=0)
+                ax2.set_xlim(left=0)
+
+                ax1.set_ylabel(tallyName)
+                ax2.set_ylabel('std')
+
+                ax1.set_xlabel(mapNames[2])
+                ax2.set_xlabel(mapNames[2])
+
+                ax1.grid()
+                ax2.grid()
+
+                if layout == 'horizontal':
+                    ax1.set_title('Value \nNormalised by the mean\n of {} values'.format(normalise_by_mean))
+                    ax2.set_title('Standard deviation\n(relative uncertainty)')
+
+                elif layout == 'vertical':
+                    ax1.set_title('Value - normalised by the mean of {} values'.format(normalise_by_mean))
+                    ax2.set_title('Standard deviation (relative uncertainty)')
+
+                plot.figlegend(title=mapNames[1], loc='lower right')
+                fig.suptitle('Monte Carlo ' + tallyName + ' ' + mapNames[0] + str(i+1) )
+
+                plot.tight_layout()
+                plot.savefig(newpath + '/' + tallyName + str(int(response_index)) + '_' + mapNames[0] + str(i+1) + '_MC.svg')
+                
+                
+        
+        elif mode == 'image':
+            for i in range(0, num_figs):
+                print('Plotting figure {:.0f} of {:.0f}'.format(i+1, num_figs))
+                if layout == 'horizontal':
+                    fig, (ax1, ax2) = plot.subplots(1,2)
+                elif layout == 'vertical':
+                    fig, (ax1, ax2) = plot.subplots(2,1)
+
+                val_plot = ax1.imshow(value_plot[i], cmap='Blues', origin='lower', aspect=aspect_ratio)
+                uncertainty_plot = ax2.imshow(std_plot[i], cmap='Reds', origin='lower', aspect=aspect_ratio)
+
+                # Set axes labels
+                ax1.set_ylabel(mapNames[1])
+                ax2.set_ylabel(mapNames[1])
+
+                ax1.set_xlabel(mapNames[2])
+                ax2.set_xlabel(mapNames[2])
+
+
+                cbar1 = fig.colorbar(val_plot, ax=ax1) #.minorticks_on()
+                cbar1.ax.set_ylabel(tallyName, rotation=270)
+                cbar1.minorticks_on()
+                cbar2 = fig.colorbar(uncertainty_plot, ax=ax2) #.minorticks_on()
+                cbar2.ax.set_ylabel('std', rotation=270)
+                cbar2.minorticks_on()
+                fig.suptitle('Monte Carlo ' + tallyName + ', for bin: ' + mapNames[0] + str(i+1) )
+
+                if layout == 'horizontal':
+                    ax1.set_title('Value \nNormalised by the mean\n of {} values'.format(normalise_by_mean))
+                    ax2.set_title('Standard deviation\n(relative uncertainty)')
+
+                elif layout == 'vertical':
+                    ax1.set_title('Value - normalised by the mean of {} values'.format(normalise_by_mean))
+                    ax2.set_title('Standard deviation (relative uncertainty)')
+
+                plot.tight_layout()
+                plot.savefig(newpath + '/' + tallyName + str(int(response_index)) + '_' + mapNames[0] + str(i+1) + '_MC.svg')
+
+    return value_plot, std_plot
+
 
 def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', response_index = 0, vmax=None, vmin=None, vmax_unc=None, vmin_unc=None, plotting=True, visualise_quarter=False, aspect_ratio=1, layout = 'horizontal'):
     """Plots quantity in Cartesian space along with the uncertainty
@@ -219,7 +430,6 @@ def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', respons
 
         else:
 
-            # val_plot = ax1.imshow(value_plot, cmap='hot', vmax=vmax, vmin=vmin)
             val_plot = ax1.imshow(value_plot, cmap='Blues', vmax=vmax, vmin=vmin, origin='lower', aspect=aspect_ratio)
             uncertainty_plot = ax2.imshow(std_plot, cmap='Reds', vmax=vmax_unc, vmin=vmin_unc, origin='lower', aspect=aspect_ratio)
             fig.colorbar(val_plot, ax=ax1).minorticks_on()
