@@ -8,6 +8,12 @@ from viz_neutronics.input2json import parse_text_to_dict, save_to_json, stringTu
 # from input2json import parse_text_to_dict, save_to_json,  dict2obj # run from within module
 
 
+# Global plot settings
+plot.rcParams['figure.constrained_layout.use'] = True   # Better subplot spacing
+plot.rcParams['axes.grid'] = True                       # Gridline
+plot.rcParams['lines.linewidth'] = 1.5                # Line width. Default is 1.5       
+
+
 # variables
 lines = ["-","--","-.",":"]
 colours = ['royalblue', 'orange', 'forestgreen', 'firebrick', 'goldenrod', 'darkviolet']
@@ -30,15 +36,16 @@ def readInputs(inputFile):
     inputs = dict2obj(inputDict)
     return inputs
 
-def readOutputs(output_file):
+def readOutputs(output_file, print_output=True):
     print('\n\nLoading {} into an output dictionary'.format(output_file))
     # returns output JSON object as python dictionary
     with open(output_file) as f:
         outputDict = json.load(f)
 
-    print('Output dictionary keys are:\n')
-    for key in outputDict.keys():
-        print('-->', key)
+    if print_output:
+        print('Output dictionary keys are:\n')
+        for key in outputDict.keys():
+            print('-->', key)
     
     outputs = dict2obj(outputDict)
     return outputs
@@ -62,7 +69,7 @@ def plotShannon(inputFile, outputFile):
     ax.set_ylabel('Shannon entropy')
     ax.set_xlabel('Iteration')
     plot.title(str(inactiveCycles) + ' inactive cycles, ' + str(activeCycles) + ' active cycles')
-    plot.tight_layout()
+    
     plot.savefig(newpath + '/Shannon_entropy.svg')
 
 
@@ -101,7 +108,7 @@ def plotScatteringMatrices(outputFile):
 
     # fig.colorbar(P0)
     fig.suptitle("Slab with vacuum boundaries, {} groups".format(numGroups))
-    plot.tight_layout()
+
 
     plot.savefig('P0_colourmap.svg')
 
@@ -129,7 +136,7 @@ def plotCellPosRR(outputFileRR):
     axy.set_ylabel('y position')
     axz.set_ylabel('z position')
     fig.suptitle('Cell positions in random ray output file')
-    plot.tight_layout()
+
     plot.savefig('outputs/cell_positions.svg')
 
 def plotDirectionalFluxRR(outputFileRR, direction):
@@ -152,7 +159,7 @@ def plotDirectionalFluxRR(outputFileRR, direction):
         ax_std.set_title('std')
 
         fig.suptitle('right flux in random ray')
-        plot.tight_layout()
+
         plot.savefig('outputs/right_flux.svg')
     elif direction == 'left':
         outputs = readOutputs(outputFileRR)
@@ -166,7 +173,7 @@ def plotDirectionalFluxRR(outputFileRR, direction):
         ax_std.set_title('std')
 
         fig.suptitle('left flux in random ray')
-        plot.tight_layout()
+
         plot.savefig('outputs/left_flux.svg')
 
 def plotMultiMapTallyMC(outputFileMC, tallyName,response_index = 0, normalise_by_mean='all', plotting=True, mapOrder = [1,2,3], layout = 'horizontal', mode = 'line', aspect_ratio = 1):
@@ -225,6 +232,8 @@ def plotMultiMapTallyMC(outputFileMC, tallyName,response_index = 0, normalise_by
         num_figs = value_plot.shape[0]
         num_traces = value_plot.shape[1]
 
+        plot.rcParams['figure.constrained_layout.use'] = True
+
         if mode == 'line':
             for i in range(0, num_figs):
                 print('Plotting figure {:.0f} of {:.0f}'.format(i+1, num_figs))
@@ -249,8 +258,7 @@ def plotMultiMapTallyMC(outputFileMC, tallyName,response_index = 0, normalise_by
                 ax1.set_xlabel(mapNames[2])
                 ax2.set_xlabel(mapNames[2])
 
-                ax1.grid()
-                ax2.grid()
+              
 
                 if layout == 'horizontal':
                     ax1.set_title('Value \nNormalised by the mean\n of {} values'.format(normalise_by_mean))
@@ -263,7 +271,7 @@ def plotMultiMapTallyMC(outputFileMC, tallyName,response_index = 0, normalise_by
                 plot.figlegend(title=mapNames[1], loc='lower right')
                 fig.suptitle('Monte Carlo ' + tallyName + ' ' + mapNames[0] + str(i+1) )
 
-                plot.tight_layout()
+       
                 plot.savefig(newpath + '/' + tallyName + str(int(response_index)) + '_' + mapNames[0] + str(i+1) + '_MC.svg')
                 
                 
@@ -303,7 +311,7 @@ def plotMultiMapTallyMC(outputFileMC, tallyName,response_index = 0, normalise_by
                     ax1.set_title('Value - normalised by the mean of {} values'.format(normalise_by_mean))
                     ax2.set_title('Standard deviation (relative uncertainty)')
 
-                plot.tight_layout()
+     
                 plot.savefig(newpath + '/' + tallyName + str(int(response_index)) + '_' + mapNames[0] + str(i+1) + '_MC.svg')
 
     return value_plot, std_plot
@@ -333,6 +341,8 @@ def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', respons
     result = np.array(getattr(outputs.active, tallyName).Res)
     value = result[...,response_index,0]
     std = result[...,response_index,1] / value
+
+    keff, stdKeff = findKeffMC(outputFileMC) # extract keff
 
 
     if visualise_quarter=='top-right':
@@ -425,9 +435,8 @@ def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', respons
             ax1.set_xlim(left=0)
             ax2.set_xlim(left=0)
 
-            ax1.grid()
-            ax2.grid()
-
+     
+     
         else:
 
             val_plot = ax1.imshow(value_plot, cmap='Blues', vmax=vmax, vmin=vmin, origin='lower', aspect=aspect_ratio)
@@ -438,10 +447,9 @@ def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', respons
         ax1.set_title('Value \nNormalised by the mean\n of {} values'.format(normalise_by_mean))
         ax2.set_title('Standard deviation\n(relative uncertainty)')
 
-        fig.suptitle('Monte Carlo ' + tallyName + '\n' + quarter_label )
+        fig.suptitle('Monte Carlo ' + tallyName + ', $k_{{eff}}$={:.5f} +/- {:.0f} pcm'.format(keff, 1e5 * stdKeff) + '\n'  + quarter_label )
     
-        plot.tight_layout()
-        
+  
         plot.savefig(newpath + '/' + tallyName + str(int(response_index)) + '_MC.svg')
         
 
@@ -476,6 +484,8 @@ def plotSpatialMaterialTallyMC(outputFileMC, tallyName, materialName, normalise_
     result = np.array(getattr(outputs.active, tallyName).Res)
     value = result[mat_index[0],...,response_index,0][0]
     std = result[mat_index[0],...,response_index,1][0] / value
+
+    keff, stdKeff = findKeffMC(outputFileMC) # extract keff
     
 
     # try to remove data from plot if the tally is 0
@@ -511,13 +521,12 @@ def plotSpatialMaterialTallyMC(outputFileMC, tallyName, materialName, normalise_
     ax1.set_title('Value \nNormalised by the mean\n of {} values'.format(normalise_by_mean))
     ax2.set_title('Standard deviation\n(relative uncertainty)')
 
-    fig.suptitle('Monte Carlo ' + tallyName )
+    fig.suptitle('Monte Carlo ' + tallyName + ', $k_{{eff}}$={:.5f} +/- {:.0f} pcm'.format(keff, 1e5 * stdKeff))
   
-    plot.tight_layout()
     plot.savefig(newpath + '/' + tallyName + '_' + materialName + '_MC.svg')
 
 
-def plotSpatialTallyRR(outputFileRR, tallyName, normalise_by_mean='all', vmax=None, vmin=None, vmax_unc=None, vmin_unc=None, plotting=True, visualise_quarter=False, aspect_ratio=1, layout='horizontal'):
+def plotSpatialTallyRR(outputFileRR, tallyName, normalise_by_mean='all', vmax=None, vmin=None, vmax_unc=None, vmin_unc=None, plotting=True, visualise_quarter=False, aspect_ratio=1, orientation='horizontal'):
     """Plots quantity in Cartesian space along with the uncertainty
 
     Args:
@@ -540,6 +549,8 @@ def plotSpatialTallyRR(outputFileRR, tallyName, normalise_by_mean='all', vmax=No
     result = getattr(outputs, tallyName)
     value = np.array(getattr(result, tallyName))[...,0]
     std = np.array(getattr(result, tallyName))[...,1]  
+
+    keff, stdKeff = findKeffRR(outputFileRR) # extract keff
 
     if visualise_quarter:
         ## The given array only covers the top-right quarter of the fuel assembly. For visualisation, need to reflect this in the array. Need to 'mask' the central fuel pins.
@@ -597,9 +608,10 @@ def plotSpatialTallyRR(outputFileRR, tallyName, normalise_by_mean='all', vmax=No
 
 
     if plotting: 
-        if layout == 'horizontal':
+
+        if orientation == 'horizontal':
             fig, (ax1, ax2) = plot.subplots(1,2)
-        elif layout == 'vertical':
+        elif orientation == 'vertical':
             fig, (ax1, ax2) = plot.subplots(2,1)
 
         # check dimension:
@@ -607,8 +619,7 @@ def plotSpatialTallyRR(outputFileRR, tallyName, normalise_by_mean='all', vmax=No
             # This is not 2D data, assume 1-dimensional.
             ax1.plot(value_plot, color='blue')
             ax2.plot(std_plot,color='red')
-            ax1.grid()
-            ax2.grid()
+         
         
         else:
 
@@ -620,15 +631,15 @@ def plotSpatialTallyRR(outputFileRR, tallyName, normalise_by_mean='all', vmax=No
         ax1.set_title('Value \nNormalised by the mean\n of {} values'.format(normalise_by_mean))
         ax2.set_title('Standard deviation\n(relative uncertainty)')
 
-        fig.suptitle('Random ray ' + tallyName )
+        fig.suptitle('Random ray ' + tallyName + ', $k_{{eff}}$={:.5f} +/- {:.0f} pcm'.format(keff, 1e5 * stdKeff) )
     
-        plot.tight_layout()
+
         plot.savefig(newpath + '/' + tallyName + '_RR_' + tallyName + '.svg')
         
     
     return value_plot, std_plot
 
-def plotSpatialTallyCompare_MCRR(outputFileMC, outputFileRR, tallyName_MC, tallyName_RR, normalise_by_mean='all', response_index_MC = 0, plotting=True, visualise_quarter=False, aspect_ratio=1, layout = 'horizontal', sideByside=False, i=0, j=None):
+def plotSpatialTallyCompare_MCRR(outputFileMC, outputFileRR, tallyName_MC, tallyName_RR, normalise_by_mean='all', response_index_MC = 0, plotting=True, visualise_quarter=False, aspect_ratio=1, orientation = 'horizontal', sideByside=False, i=0, j=None):
     """Plot which compares a Monte Carlo and random ray output.
 
     Args:
@@ -645,7 +656,7 @@ def plotSpatialTallyCompare_MCRR(outputFileMC, outputFileRR, tallyName_MC, tally
         visualise_quarter (bool or str, optional): Defaults to False.If False, plot normally. Otherwise displays plot reflected in both y and x axes, according to the string:
                             Could be ['top-left', 'top-right', 'bottom-left', 'bottom-right'].
         aspect_ratio (int, optional): The ratio of y pixels vs x pixels when displayed. Defaults to 1.
-        layout (str, optional): Determines whether value plot and uncertainty plot are adjacent horizontally ('horizontal') or vertically ('vertical). 
+        orientation (str, optional): Determines whether value plot and uncertainty plot are adjacent horizontally ('horizontal') or vertically ('vertical). 
                                 Defaults to 'horizontal'.
         sideByside (bool, optional): For a 1D plot only. If 1D plot is detected, and this is True, then instead of plotting the relative difference, plots the values themselves on the same axes.
                                 Defaults to False.
@@ -659,33 +670,46 @@ def plotSpatialTallyCompare_MCRR(outputFileMC, outputFileRR, tallyName_MC, tally
     value_MC, std_MC = plotSpatialTallyMC(outputFileMC, tallyName=tallyName_MC, normalise_by_mean=normalise_by_mean, response_index=response_index_MC, visualise_quarter=visualise_quarter, plotting=False)
     value_RR, std_RR = plotSpatialTallyRR(outputFileRR, tallyName=tallyName_RR, normalise_by_mean=normalise_by_mean, visualise_quarter=visualise_quarter, plotting=False)
 
+    # extract keff values from the outputs
+
+    keff_MC, stdKeffMC = findKeffMC(outputFileMC)
+    keff_RR, stdKeffRR = findKeffRR(outputFileRR)
+
+    # If slicing:
+    value_MC = np.copy(value_MC)[i:j] 
+    value_RR = np.copy(value_RR)[i:j]
+    std_MC = np.copy(std_MC)[i:j]
+    std_RR = np.copy(std_RR)[i:j]
+    
     # Calculate quantities
     rel_diff = (value_RR - value_MC) / value_MC
     rel_diff_unc = np.sqrt((std_RR/value_MC**2)**2 +(std_MC * value_RR/value_MC**2) ** 2)
 
     # calculate statistics
 
-    rel_diff = np.copy(np.where(np.isnan(value_MC), 0, rel_diff))[i:j]    # deal with nans in the original arrays
-    rel_diff_unc = np.copy(np.where(np.isnan(value_MC), 0, rel_diff_unc))[i:j]
+    rel_diff = np.copy(np.where(np.isnan(value_MC), 0, rel_diff))   # deal with nans in the original arrays
+    rel_diff_unc = np.copy(np.where(np.isnan(value_MC), 0, rel_diff_unc))
 
-    rel_diff_for_max = np.where(value_MC[i:j]< 1e-16,0, rel_diff)    # in a fuel assembly, areas with 0 fission rate cause a divide by zero error in the relative difference. This isn't an issue for plotting, but for the max error 
+    rel_diff_for_max = np.where(value_MC< 1e-16,0, rel_diff)    # in a fuel assembly, areas with 0 fission rate cause a divide by zero error in the relative difference. This isn't an issue for plotting, but for the max error 
     max_error = np.max(rel_diff_for_max)
 
     min_error = np.min(rel_diff_for_max)
     max_abs_err = np.max(np.abs([max_error, min_error]))
 
-    rmse = rmsError(value_MC[i:j], value_RR[i:j])
-    meanErr = meanError(value_MC[i:j], value_RR[i:j])
+    rmse = rmsError(value_MC, value_RR)
+    meanErr = meanError(value_MC, value_RR)
     # max_error = np.max(np.abs(rel_diff))
 
     # Turn NaNs back into 0s for plotting    
     rel_diff = np.where(np.isnan(rel_diff), 0, rel_diff)
     rel_diff_unc = np.where(np.isnan(rel_diff_unc), 0, rel_diff_unc)
 
+    plot.rcParams['figure.constrained_layout.use'] = True
+
     if plotting:
-        if layout == 'horizontal':
+        if orientation == 'horizontal':
             fig, (ax1, ax2) = plot.subplots(1,2)
-        elif layout == 'vertical':
+        elif orientation == 'vertical':
             fig, (ax1, ax2) = plot.subplots(2,1)
         # check dimension:
         if rel_diff.ndim < 2:
@@ -708,7 +732,7 @@ def plotSpatialTallyCompare_MCRR(outputFileMC, outputFileRR, tallyName_MC, tally
                 ax2.plot(rel_diff_unc, color='red')
 
                 ax1.set_ylabel('Relative diff')
-                ax2.set_ylabel('Combine uncertainty')       
+                ax2.set_ylabel('Combined uncertainty')       
 
 
             # put x axis at y=0
@@ -730,13 +754,135 @@ def plotSpatialTallyCompare_MCRR(outputFileMC, outputFileRR, tallyName_MC, tally
         ax1.set_title('Value \nNormalised by the mean\n of {} values'.format(normalise_by_mean))
         ax2.set_title('Standard deviation\n(relative uncertainty)')
 
-        ax1.grid()
-        ax2.grid()
+      
 
-        fig.suptitle('(RR -MC) / MC: relative difference in {}. \nMax error={:.3%}, min error={:.3%}, \nRMSE={:.3%}, mean error={:.3%} relative to max MC {}.'.format(tallyName_RR, max_error, min_error, rmse, meanErr, tallyName_MC))
+        fig.suptitle('(RR -MC) / MC: relative difference in {}. \nMax error={:.3%}, min error={:.3%}, \nRMSE={:.3%}, mean error={:.3%} relative to max MC {}.\n$k_{{MC}}={:.5f}$, $k_{{RR}}={:.5f}$, diff={:.0f} pcm'.format(tallyName_RR, max_error, min_error, rmse, meanErr, tallyName_MC, keff_MC, keff_RR, 1e5*(keff_RR-keff_MC)))
 
-        plot.tight_layout()
+  
         plot.savefig(newpath + '/compare_MCRR' + tallyName_RR + '.svg')
+
+
+def plotSpatialTallyCompare_MCMC(outputFileMC1, outputFileMC2, tallyName_MC1, tallyName_MC2, normalise_by_mean='all', response_index_MC1 = 0, response_index_MC2 = 0, plotting=True, visualise_quarter=False, aspect_ratio=1, orientation = 'horizontal', sideByside=False, i=0, j=None):
+    """Plot which compares a Monte Carlo and random ray output.
+
+    Args:
+        outputFileMC (str): Monte Carlo output filepath
+        outputFileRR (str): Random ray output filepath
+        tallyName_MC (str): The tally name in the Monte Carlo file
+        tallyName_RR (str): The tally name in the random ray file
+        normalise_by_mean (str, optional): Normalise the tally value to the mean value. Defaults to 'all'.
+                            If 'all', the mean of all values is used. 
+                            If 'non-zero', then only non-zero values are used to calculate the mean. 
+                            If None, no normalisation is applied. 
+        response_index_MC (int, optional): If multiple responses have been tallied for this clerk, use this index to specify which one to plot. Defaults to 0.
+        plotting (bool, optional): If True, plots and saves a figure. Otherwise just returns the values. Defaults to True.
+        visualise_quarter (bool or str, optional): Defaults to False.If False, plot normally. Otherwise displays plot reflected in both y and x axes, according to the string:
+                            Could be ['top-left', 'top-right', 'bottom-left', 'bottom-right'].
+        aspect_ratio (int, optional): The ratio of y pixels vs x pixels when displayed. Defaults to 1.
+        orientation (str, optional): Determines whether value plot and uncertainty plot are adjacent horizontally ('horizontal') or vertically ('vertical). 
+                                Defaults to 'horizontal'.
+        sideByside (bool, optional): For a 1D plot only. If 1D plot is detected, and this is True, then instead of plotting the relative difference, plots the values themselves on the same axes.
+                                Defaults to False.
+        i (int, optional): Starting index for slicing a 1D output array. Defaults to 0.
+    """
+     # make an output folder to store outputs
+    newpath = 'outputs'
+    if not os.path.exists(newpath):
+        os.makedirs(newpath)
+    
+    value1, std1 = plotSpatialTallyMC(outputFileMC1, tallyName=tallyName_MC1, normalise_by_mean=normalise_by_mean, response_index=response_index_MC1, visualise_quarter=visualise_quarter, plotting=False)
+    value2, std2 = plotSpatialTallyMC(outputFileMC2, tallyName=tallyName_MC2, normalise_by_mean=normalise_by_mean, response_index=response_index_MC2, visualise_quarter=visualise_quarter, plotting=False)
+
+    # extract keff values from the outputs
+
+    keff1, stdKeff1 = findKeffMC(outputFileMC1)
+    keff2, stdKeff2 = findKeffMC(outputFileMC2)
+
+    # If slicing:
+    value1 = np.copy(value1)[i:j] 
+    value2 = np.copy(value2)[i:j]
+    std1 = np.copy(std1)[i:j]
+    std2 = np.copy(std2)[i:j]
+    
+    # Calculate quantities
+    rel_diff = (value2 - value1) / value1
+    rel_diff_unc = np.sqrt((std2/value1**2)**2 +(std1 * value2/value1**2) ** 2)
+
+    # calculate statistics
+
+    rel_diff = np.copy(np.where(np.isnan(value1), 0, rel_diff))   # deal with nans in the original arrays
+    rel_diff_unc = np.copy(np.where(np.isnan(value1), 0, rel_diff_unc))
+
+    rel_diff_for_max = np.where(value1< 1e-16,0, rel_diff)    # in a fuel assembly, areas with 0 fission rate cause a divide by zero error in the relative difference. This isn't an issue for plotting, but for the max error 
+    max_error = np.max(rel_diff_for_max)
+
+    min_error = np.min(rel_diff_for_max)
+    max_abs_err = np.max(np.abs([max_error, min_error]))
+
+    rmse = rmsError(value1, value2)
+    meanErr = meanError(value1, value2)
+    # max_error = np.max(np.abs(rel_diff))
+
+    # Turn NaNs back into 0s for plotting    
+    rel_diff = np.where(np.isnan(rel_diff), 0, rel_diff)
+    rel_diff_unc = np.where(np.isnan(rel_diff_unc), 0, rel_diff_unc)
+
+    plot.rcParams['figure.constrained_layout.use'] = True
+
+    if plotting:
+        if orientation == 'horizontal':
+            fig, (ax1, ax2) = plot.subplots(1,2)
+        elif orientation == 'vertical':
+            fig, (ax1, ax2) = plot.subplots(2,1)
+        # check dimension:
+        if rel_diff.ndim < 2:
+            # This is not 2D data, assume 1-dimensional.
+
+            # May need to plot the values themselves rather than the difference for a 'side-by'side' comparison
+            if sideByside:
+                ax1.plot(value1, color='black', linestyle='dashed', label='MC1')
+                ax1.plot(value2, color='green', label='MC2')
+
+                ax2.plot(std1, color='black',linestyle='dashed')
+                ax2.plot(std2, color='green')
+
+                ax1.set_ylabel(tallyName_MC2)
+                ax2.set_ylabel('standard deviation')
+                plot.figlegend()
+
+            elif sideByside== False:
+                ax1.plot(rel_diff, color='blue')
+                ax2.plot(rel_diff_unc, color='red')
+
+                ax1.set_ylabel('Relative diff')
+                ax2.set_ylabel('Combined uncertainty')       
+
+
+            # put x axis at y=0
+            ax1.spines['bottom'].set_position(('data', 0.0000))
+            ax2.spines['bottom'].set_position(('data', 0.0000))
+
+            ax1.set_xlim(left=0)
+            ax2.set_xlim(left=0)
+
+            
+        
+        else:
+            val_plot = ax1.imshow(rel_diff, cmap='RdBu_r', vmax=max_abs_err, vmin=-max_abs_err, origin='lower', aspect=aspect_ratio)
+
+            uncertainty_plot = ax2.imshow(rel_diff_unc, cmap='Reds', origin='lower', aspect=aspect_ratio)
+            fig.colorbar(val_plot, ax=ax1).minorticks_on()
+            fig.colorbar(uncertainty_plot, ax=ax2).minorticks_on()
+
+        ax1.set_title('Value \nNormalised by the mean\n of {} values'.format(normalise_by_mean))
+        ax2.set_title('Standard deviation\n(relative uncertainty)')
+
+      
+
+        fig.suptitle('(val2 -val1) / val1: relative difference in {}. \nMax diff={:.3%}, min diff={:.3%}, \nRMS diff={:.3%}, mean diff={:.3%} relative to max MC1 {}.\n$k_{{1}}={:.5f}$, $k_{{2}}={:.5f}$, diff={:.0f} pcm'.format(tallyName_MC2, max_error, min_error, rmse, meanErr, tallyName_MC1, keff1, keff2, 1e5*(keff2-keff1)))
+
+  
+        plot.savefig(newpath + '/compare_MCMC' + tallyName_MC1+ str(int(response_index_MC1)) + '.svg')
 
 def plotSpatialTallyCompare_MCMG(outputFileCE, outputFileMG, tallyName_CE, tallyName_MG, normalise_by_mean='all', response_index_CE = 0, response_index_MG = 0,  visualise_quarter=False ):
     """Compares the output of two Monte Carlo files, one using continuous energy and the other multigroup
@@ -790,7 +936,6 @@ def plotSpatialTallyCompare_MCMG(outputFileCE, outputFileMG, tallyName_CE, tally
 
     fig.suptitle('(MG-CE) / CE: relative difference in {}. \nMax error={:.3%}, min error={:.3%}, \nRMSE={:.3%}, mean error={:.3%} relative to max MC {}.'.format(tallyName_CE, max_error, min_error, rmse, meanErr, tallyName_CE))
 
-    # plot.tight_layout()
     plot.savefig(newpath + '/compare_MCMG_' + tallyName_CE + '.svg')
 
 
@@ -853,7 +998,7 @@ def plotFissionRatesRR_radial(outputFile, normalise_plot=False, target=100):
     ax.set_ylabel('Fission rate')
     ax.set_xlabel('radius (cm)')
     ax.set_title('Fission rate against radius')
-    plot.grid()
+  
     plot.savefig('Fission_rate_RR.svg')
 
 
@@ -872,7 +1017,7 @@ def plotFissionRatesMC_radial(outputFile, normalise_plot=False, target=100):
     ax.set_ylabel('Fission rate')
     ax.set_xlabel('radius (cm)')
     ax.set_title('Fission rate against radius')
-    plot.grid()
+
     plot.savefig('Fission_rate_MC.svg')
 
     
@@ -930,7 +1075,7 @@ def plotFissionRatesCompare_radial_MC_RR(outputFileMC,outputFileRR, target=100):
     ax.set_ylabel('% (RR-MC)/MC')
     ax.set_xlabel('radius (cm)')
     plot.title('Fission rate against radius.\nMax error={:.4f}%, RMSE={:.4e}'.format(max_error, rmse))
-    plot.grid()
+
     plot.savefig('Relative_diff_fission_rate.svg')
 
 
@@ -970,7 +1115,7 @@ def plotFluxSpectrumMC(outputFileMC):
         ax.set_ylabel('Flux')
         ax.set_xlabel('MeV')
         ax.set_title('{:.0f} groups, flux for {}.'.format(len(EnergyBounds_plot[0]), material))
-        plot.grid()
+ 
         plot.savefig('Flux_spectrum_' + material+'.svg')
        
        
@@ -1022,6 +1167,35 @@ def findFluxMC(outputFileMC):
     flux = reactionRate[...,0,0]
     flux_std = reactionRate[...,0,1]
     return flux, flux_std
+
+def findKeffMC(outputFileMC):
+    """Finds the k_eff value from the MC output file.
+
+    Args:
+        outputFileMC (str): The path to the MC output file.
+
+    Returns:
+        float: The k_eff value.
+    """
+    outputs = readOutputs(outputFileMC, print_output=False)
+    keff = outputs.keff.K_EFF[0]
+    std = outputs.keff.K_EFF[1]
+
+    return keff, std
+
+def findKeffRR(outputFileRR):
+    """Finds the k_eff value from the random ray output file.
+
+    Args:
+        outputFileRR (str): The path to the random ray output file.
+
+    Returns:
+        float: The k_eff value.
+    """
+    outputs = readOutputs(outputFileRR, print_output=False)
+    keff = outputs.keff.keff[0]
+    std = outputs.keff.keff[1]
+    return keff, std
 
 def normalise(array, target):
     # array_norm = array / np.max(array)
