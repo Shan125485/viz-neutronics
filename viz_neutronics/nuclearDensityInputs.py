@@ -95,7 +95,8 @@ Cr = {'Mr': 52,'wtPerc': wtPercCr}
 
 
 #### water at 300C
-water_temp = 312.7 # Celsius
+# water_temp = 312.7 # Celsius
+water_temp = 293 # Celsius
 
 # Calculation for water density based on fixed reference of 0.7 g/cm^3 aat 300C
 water_temp = water_temp + 273 # Kelvin
@@ -110,13 +111,14 @@ H = {"Mr": 1, "atPerc": 2}
 
 # ppm 
 PPM = 1175
+# PPM = 975 # For BEAVRS https://bpb-us-e1.wpmucdn.com/sites.mit.edu/dist/9/643/files/2017/01/BEAVRS_2.0.2_spec.pdf
 B_10 = {"Mr": 10, "atPerc": 20}
 B_11 = {"Mr": 11, "atPerc": 80}
 B = {"B-10": B_10, "B-11": B_11, 'wtPerc': 1175 / 1e6}
 H2O = {'O': O, 'H': H,  'wtPerc': 1}
 
 H2O_boronated = {'H2O': H2O, 'B': B, 'density': waterDensity}
-#input = H2O_boronated
+input = H2O_boronated
 
 ## steel for RPV ### ASME A508 Grade 3   https://cdn.standards.iteh.ai/samples/28504/748d0804e90c4bc9ace68144efbd9b03/ASTM-A508-A508M-03.pdf
 steelDensity = 7.75 # generic stainless steel
@@ -167,7 +169,7 @@ H2O = {'O': O, 'H': H,  'density': volWater * waterDensity }
 steel = {'Fe': Fe,'C': carbon, 'Mn': manganese, 'Si': silicon, 'Ni': nickel, 'Cr': chromium, 'Mo': molybdenum, 'density':volSteel * steelDensity }
 
 # input = H2O
-input = steel
+# input = steel
 
 
 

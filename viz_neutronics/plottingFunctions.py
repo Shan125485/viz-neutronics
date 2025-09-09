@@ -10,7 +10,7 @@ from viz_neutronics.input2json import parse_text_to_dict, save_to_json, stringTu
 
 # Global plot settings
 plot.rcParams['figure.constrained_layout.use'] = True   # Better subplot spacing
-plot.rcParams['axes.grid'] = True                       # Gridline
+plot.rcParams['axes.grid'] = False                       # Gridline
 plot.rcParams['lines.linewidth'] = 1.5                # Line width. Default is 1.5       
 
 
@@ -317,7 +317,7 @@ def plotMultiMapTallyMC(outputFileMC, tallyName,response_index = 0, normalise_by
     return value_plot, std_plot
 
 
-def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', response_index = 0, vmax=None, vmin=None, vmax_unc=None, vmin_unc=None, plotting=True, visualise_quarter=False, aspect_ratio=1, layout = 'horizontal'):
+def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', response_index = 0, vmax=None, vmin=None, vmax_unc=None, vmin_unc=None, plotting=True, visualise_quarter=False, aspect_ratio=1, layout = 'horizontal', remove_edges_2D=False):
     """Plots quantity in Cartesian space along with the uncertainty
 
     Args:
@@ -336,7 +336,7 @@ def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', respons
     if not os.path.exists(newpath):
         os.makedirs(newpath)
 
-    outputs = readOutputs(outputFileMC)
+    outputs = readOutputs(outputFileMC, print_output=False)
 
     result = np.array(getattr(outputs.active, tallyName).Res)
     value = result[...,response_index,0]
@@ -344,60 +344,23 @@ def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', respons
 
     keff, stdKeff = findKeffMC(outputFileMC) # extract keff
 
+    # symmetry check
+    print('MC value symmetry check:')
+    value_MC_flip = np.flip(value,0)
+    print(value_MC_flip)
+    print(100*(value_MC_flip - value_MC_flip.T)/value_MC_flip)
 
-    if visualise_quarter=='top-right':
-        ## The given array only covers the top-right quarter of the fuel assembly. For visualisation, need to reflect this in the array. Need to 'mask' the central fuel pins.
-        # step 1, double the stats in the centre, and alter the relative uncertainty to reflect this
-        value[0,:] = 2 * value[0,:]
-        value[1:, 0] = 2 * value[1:, 0]
 
-        std[0,:] = std[0,:] / 2
-        std[1:, 0] = std[1:, 0] / 2
+    print('MC symmetry check:')
+    print(np.allclose(value_MC_flip, value_MC_flip.T, rtol=1e-3, atol=1e-3))
 
-        # step 2 flip and concatenate
-        value = np.concatenate([ np.flip(value, 0), value])
-        value = np.concatenate([ np.flip(value, 1), value],1)
-        std = np.concatenate([np.flip(std, 0), std])
-        std = np.concatenate([np.flip(std, 1), std],1)
+    value, std, removed_edges_label = removeEdges2D(value, std, remove_edges_2D=remove_edges_2D)
+   
+    value, std, quarter_label = visualiseQuarter(value, std, visualise_quarter=visualise_quarter)
 
-        # now remove the central row and column to avoid duplication
-        midindex = value.shape[0] // 2
-        value = np.delete(value, midindex, 0)
-        value = np.delete(value, midindex, 1)
-        std = np.delete(std, midindex, 0)
-        std = np.delete(std, midindex, 1)
-
-        # step 3 write a label
-        quarter_label = '(visual adjusted for quarter geometry)'
-
-    elif visualise_quarter == 'bottom-right':
-        ## The given array only covers the bottom-right quarter of the fuel assembly. For visualisation, need to reflect this in the array. Need to 'mask' the central fuel pins.
-        # step 1, double the stats in the centre, and alter the relative uncertainty to reflect this
-        value[0,:] = 2 * value[0,:]
-        value[1:, 0] = 2 * value[1:, 0]
-
-        std[0,:] = std[0,:] / 2
-        std[1:, 0] = std[1:, 0] / 2
-
-        # step 2 flip and concatenate
-        value = np.concatenate([ value,np.flip(value, 0) ])
-        value = np.concatenate([ np.flip(value, 1), value],1)
-
-        std = np.concatenate([ std, np.flip(std, 0)])
-        std = np.concatenate([np.flip(std, 1), std],1)
-
-        # now remove the central row and column to avoid duplication
-        midindex = value.shape[0] // 2
-        value = np.delete(value, midindex, 0)
-        value = np.delete(value, midindex, 1)
-        std = np.delete(std, midindex, 0)
-        std = np.delete(std, midindex, 1)
-
-        # step 3 write a label
-        quarter_label = '(visual adjusted for quarter geometry)'
-
-    else:
-        quarter_label = ""
+   
+    
+    
 
     # try to remove data from plot if the tally is 0
     value_plot = np.copy(np.where(value < 1e-18, np.nan, value))
@@ -424,6 +387,7 @@ def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', respons
     if plotting:
         if layout == 'horizontal':
             fig, (ax1, ax2) = plot.subplots(1,2)
+            # fig, ax1 = plot.subplots() # TEMP
         elif layout == 'vertical':
             fig, (ax1, ax2) = plot.subplots(2,1)
         
@@ -435,19 +399,21 @@ def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', respons
             ax1.set_xlim(left=0)
             ax2.set_xlim(left=0)
 
-     
-     
         else:
 
-            val_plot = ax1.imshow(value_plot, cmap='Blues', vmax=vmax, vmin=vmin, origin='lower', aspect=aspect_ratio)
-            uncertainty_plot = ax2.imshow(std_plot, cmap='Reds', vmax=vmax_unc, vmin=vmin_unc, origin='lower', aspect=aspect_ratio)
+            # val_plot = ax1.imshow(value_plot, cmap='Blues', vmax=vmax, vmin=vmin, origin='lower', aspect=aspect_ratio)
+            # val_plot = ax1.imshow(value_plot, cmap='viridis', vmax=vmax, vmin=vmin, origin='lower', aspect=aspect_ratio)
+            val_plot = ax1.imshow(value_plot, cmap='magma', vmax=vmax, vmin=vmin, origin='lower', aspect=aspect_ratio)
+            # uncertainty_plot = ax2.imshow(std_plot, cmap='Reds', vmax=vmax_unc, vmin=vmin_unc, origin='lower', aspect=aspect_ratio)
+            uncertainty_plot = ax2.imshow(std_plot, cmap='Greens', vmax=vmax_unc, vmin=vmin_unc, origin='lower', aspect=aspect_ratio)
             fig.colorbar(val_plot, ax=ax1).minorticks_on()
             fig.colorbar(uncertainty_plot, ax=ax2).minorticks_on()
 
-        ax1.set_title('Value \nNormalised by the mean\n of {} values'.format(normalise_by_mean))
+        ax1.set_title('Fission rate') # TEMP
+        # ax1.set_title('Value \nNormalised by the mean\n of {} values'.format(normalise_by_mean))
         ax2.set_title('Standard deviation\n(relative uncertainty)')
 
-        fig.suptitle('Monte Carlo ' + tallyName + ', $k_{{eff}}$={:.5f} +/- {:.0f} pcm'.format(keff, 1e5 * stdKeff) + '\n'  + quarter_label )
+        fig.suptitle('Monte Carlo ' + tallyName + ', $k_{{eff}}$={:.5f} +/- {:.0f} pcm'.format(keff, 1e5 * stdKeff) + '\n'  + quarter_label  + '\n'  + removed_edges_label )
     
   
         plot.savefig(newpath + '/' + tallyName + str(int(response_index)) + '_MC.svg')
@@ -526,7 +492,7 @@ def plotSpatialMaterialTallyMC(outputFileMC, tallyName, materialName, normalise_
     plot.savefig(newpath + '/' + tallyName + '_' + materialName + '_MC.svg')
 
 
-def plotSpatialTallyRR(outputFileRR, tallyName, normalise_by_mean='all', vmax=None, vmin=None, vmax_unc=None, vmin_unc=None, plotting=True, visualise_quarter=False, aspect_ratio=1, orientation='horizontal'):
+def plotSpatialTallyRR(outputFileRR, tallyName, normalise_by_mean='all', vmax=None, vmin=None, vmax_unc=None, vmin_unc=None, plotting=True, visualise_quarter=False, aspect_ratio=1, orientation='horizontal', remove_edges_2D=False):
     """Plots quantity in Cartesian space along with the uncertainty
 
     Args:
@@ -552,34 +518,9 @@ def plotSpatialTallyRR(outputFileRR, tallyName, normalise_by_mean='all', vmax=No
 
     keff, stdKeff = findKeffRR(outputFileRR) # extract keff
 
-    if visualise_quarter:
-        ## The given array only covers the top-right quarter of the fuel assembly. For visualisation, need to reflect this in the array. Need to 'mask' the central fuel pins.
-        # step 1, double the stats in the centre, and alter the relative uncertainty to reflect this
-        value[0,:] = 2 * value[0,:]
-        value[1:, 0] = 2 * value[1:, 0]
+    value, std, removed_edges_label = removeEdges2D(value, std, remove_edges_2D=remove_edges_2D)
 
-        std[0,:] = std[0,:] / 2
-        std[1:, 0] = std[1:, 0] / 2
-
-        # step 2 flip and concatenate
-        value = np.concatenate([ np.flip(value, 0), value])
-        value = np.concatenate([ np.flip(value, 1), value],1)
-        std = np.concatenate([np.flip(std, 0), std])
-        std = np.concatenate([np.flip(std, 1), std],1)
-
-        # now remove the central row and column to avoid duplication
-        midindex = value.shape[0] // 2
-        value = np.delete(value, midindex, 0)
-        value = np.delete(value, midindex, 1)
-        std = np.delete(std, midindex, 0)
-        std = np.delete(std, midindex, 1)
-
-        # step 3 write a label
-        quarter_label = '(visual adjusted for quarter geometry)'
-    else:
-        quarter_label = ""
-
-
+    value, std, quarter_label = visualiseQuarter(value, std, visualise_quarter=visualise_quarter)
 
     # try to remove data from plot if the tally is 0
     value_plot = np.copy(np.where(value < 1e-18, np.nan, value))
@@ -623,7 +564,8 @@ def plotSpatialTallyRR(outputFileRR, tallyName, normalise_by_mean='all', vmax=No
         
         else:
 
-            val_plot = ax1.imshow(value_plot, cmap='Blues', vmax=vmax, vmin=vmin, origin='lower', aspect=aspect_ratio)
+            # val_plot = ax1.imshow(value_plot, cmap='Blues', vmax=vmax, vmin=vmin, origin='lower', aspect=aspect_ratio)
+            val_plot = ax1.imshow(value_plot, cmap='viridis', vmax=vmax, vmin=vmin, origin='lower', aspect=aspect_ratio)
             uncertainty_plot = ax2.imshow(std_plot, cmap='Reds', vmax=vmax_unc, vmin=vmin_unc, origin='lower', aspect=aspect_ratio)
             fig.colorbar(val_plot, ax=ax1).minorticks_on()
             fig.colorbar(uncertainty_plot, ax=ax2).minorticks_on()
@@ -631,7 +573,7 @@ def plotSpatialTallyRR(outputFileRR, tallyName, normalise_by_mean='all', vmax=No
         ax1.set_title('Value \nNormalised by the mean\n of {} values'.format(normalise_by_mean))
         ax2.set_title('Standard deviation\n(relative uncertainty)')
 
-        fig.suptitle('Random ray ' + tallyName + ', $k_{{eff}}$={:.5f} +/- {:.0f} pcm'.format(keff, 1e5 * stdKeff) )
+        fig.suptitle('Random ray ' + tallyName + ', $k_{{eff}}$={:.5f} +/- {:.0f} pcm'.format(keff, 1e5 * stdKeff)+ '\n'  + quarter_label  + '\n'  + removed_edges_label  )
     
 
         plot.savefig(newpath + '/' + tallyName + '_RR_' + tallyName + '.svg')
@@ -639,7 +581,7 @@ def plotSpatialTallyRR(outputFileRR, tallyName, normalise_by_mean='all', vmax=No
     
     return value_plot, std_plot
 
-def plotSpatialTallyCompare_MCRR(outputFileMC, outputFileRR, tallyName_MC, tallyName_RR, normalise_by_mean='all', response_index_MC = 0, plotting=True, visualise_quarter=False, aspect_ratio=1, orientation = 'horizontal', sideByside=False, i=0, j=None):
+def plotSpatialTallyCompare_MCRR(outputFileMC, outputFileRR, tallyName_MC, tallyName_RR, normalise_by_mean='all', response_index_MC = 0, plotting=True, visualise_quarter=False, aspect_ratio=1, orientation = 'horizontal', sideByside=False, i=0, j=None, remove_edges_2D=False):
     """Plot which compares a Monte Carlo and random ray output.
 
     Args:
@@ -667,19 +609,59 @@ def plotSpatialTallyCompare_MCRR(outputFileMC, outputFileRR, tallyName_MC, tally
     if not os.path.exists(newpath):
         os.makedirs(newpath)
     
-    value_MC, std_MC = plotSpatialTallyMC(outputFileMC, tallyName=tallyName_MC, normalise_by_mean=normalise_by_mean, response_index=response_index_MC, visualise_quarter=visualise_quarter, plotting=False)
-    value_RR, std_RR = plotSpatialTallyRR(outputFileRR, tallyName=tallyName_RR, normalise_by_mean=normalise_by_mean, visualise_quarter=visualise_quarter, plotting=False)
+    value_MC, std_MC = plotSpatialTallyMC(outputFileMC, tallyName=tallyName_MC, normalise_by_mean=normalise_by_mean, response_index=response_index_MC, visualise_quarter=visualise_quarter, plotting=False, remove_edges_2D=remove_edges_2D)
+    value_RR, std_RR = plotSpatialTallyRR(outputFileRR, tallyName=tallyName_RR, normalise_by_mean=normalise_by_mean, visualise_quarter=visualise_quarter, plotting=False, remove_edges_2D=remove_edges_2D)
+
+    # extract labels:
+    dummy_value = np.ones((2,2))
+    dummy_std = np.ones((2,2))
+    dummy_value, dummy_std, removed_edges_label = removeEdges2D(dummy_value, dummy_std, remove_edges_2D=remove_edges_2D)
+    dummy_value, dummy_std, quarter_label = visualiseQuarter(dummy_value, dummy_std, visualise_quarter=visualise_quarter)
+    print('Removed edges label:', removed_edges_label)
+    print('Quarter label:', quarter_label)
+
+    # check symmetry
+    print('MC value symmetry check:')
+    value_MC_flip = np.flip(value_MC,0)
+    value_RR_flip = np.flip(value_RR,0)
+    print(100*(value_MC_flip - value_MC_flip.T)/value_MC_flip)
+
+    print('RR value symmetry check:')
+    print(100*(value_RR_flip - value_RR_flip.T)/value_RR_flip)
+
+    print('MC symmetry check:')
+    print(np.allclose(value_MC_flip, value_MC_flip.T, rtol=5e-3, atol=0))
+    print('RR symmetry check:')
+    print(np.allclose(value_RR_flip, value_RR_flip.T, rtol=5e-3, atol=0))
+
 
     # extract keff values from the outputs
 
     keff_MC, stdKeffMC = findKeffMC(outputFileMC)
     keff_RR, stdKeffRR = findKeffRR(outputFileRR)
 
-    # If slicing:
+    # If slicing in 1D:
     value_MC = np.copy(value_MC)[i:j] 
     value_RR = np.copy(value_RR)[i:j]
     std_MC = np.copy(std_MC)[i:j]
     std_RR = np.copy(std_RR)[i:j]
+
+    # TEMP TODO turn slicing option 2D
+
+    # k = 8
+    # l = -8
+    # value_MC = np.copy(value_MC)[:l, k:] 
+    # value_RR = np.copy(value_RR)[:l, k:]
+    # std_MC = np.copy(std_MC)[:l,k:]
+    # std_RR = np.copy(std_RR)[:l,k:]
+    # k = 153
+    # l = 153
+    # value_MC = np.copy(value_MC)[8:l,:k] 
+    # value_RR = np.copy(value_RR)[:l,:k]
+    # std_MC = np.copy(std_MC)[:l,:k]
+    # std_RR = np.copy(std_RR)[:l,:k]
+
+    
     
     # Calculate quantities
     rel_diff = (value_RR - value_MC) / value_MC
@@ -708,7 +690,8 @@ def plotSpatialTallyCompare_MCRR(outputFileMC, outputFileRR, tallyName_MC, tally
 
     if plotting:
         if orientation == 'horizontal':
-            fig, (ax1, ax2) = plot.subplots(1,2)
+            # fig, (ax1, ax2) = plot.subplots(1,2)
+            fig, ax1 = plot.subplots() # TEMP
         elif orientation == 'vertical':
             fig, (ax1, ax2) = plot.subplots(2,1)
         # check dimension:
@@ -744,19 +727,24 @@ def plotSpatialTallyCompare_MCRR(outputFileMC, outputFileRR, tallyName_MC, tally
 
             
         
-        else:
-            val_plot = ax1.imshow(rel_diff, cmap='RdBu_r', vmax=max_abs_err, vmin=-max_abs_err, origin='lower', aspect=aspect_ratio)
+        else: # 2D data
+            # val_plot = ax1.imshow(rel_diff, cmap='RdBu_r', vmax=max_abs_err, vmin=-max_abs_err, origin='lower', aspect=aspect_ratio)
+            # val_plot = ax1.imshow(rel_diff, cmap='jet', origin='lower', aspect=aspect_ratio)
+            val_plot = ax1.imshow(rel_diff, cmap='viridis', origin='lower', aspect=aspect_ratio)
+            # val_plot = ax1.imshow(rel_diff, cmap='rainbow', origin='lower', aspect=aspect_ratio)
+            # val_plot = ax1.imshow(rel_diff, cmap='magma', origin='lower', aspect=aspect_ratio)
 
-            uncertainty_plot = ax2.imshow(rel_diff_unc, cmap='Reds', origin='lower', aspect=aspect_ratio)
+            # uncertainty_plot = ax2.imshow(rel_diff_unc, cmap='Reds', origin='lower', aspect=aspect_ratio)
             fig.colorbar(val_plot, ax=ax1).minorticks_on()
-            fig.colorbar(uncertainty_plot, ax=ax2).minorticks_on()
+            # fig.colorbar(uncertainty_plot, ax=ax2).minorticks_on()
 
-        ax1.set_title('Value \nNormalised by the mean\n of {} values'.format(normalise_by_mean))
-        ax2.set_title('Standard deviation\n(relative uncertainty)')
+        # ax1.set_title('Value \nNormalised by the mean\n of {} values'.format(normalise_by_mean))
+        ax1.set_title('Fission rate') # TEMP
+        # ax2.set_title('Standard deviation\n(relative uncertainty)')
 
       
 
-        fig.suptitle('(RR -MC) / MC: relative difference in {}. \nMax error={:.3%}, min error={:.3%}, \nRMSE={:.3%}, mean error={:.3%} relative to max MC {}.\n$k_{{MC}}={:.5f}$, $k_{{RR}}={:.5f}$, diff={:.0f} pcm'.format(tallyName_RR, max_error, min_error, rmse, meanErr, tallyName_MC, keff_MC, keff_RR, 1e5*(keff_RR-keff_MC)))
+        fig.suptitle('(RR -MC) / MC: relative difference in {}. \nMax error={:.3%}, min error={:.3%}, \nRMSE={:.3%}, mean error={:.3%} relative to max MC {}.\n$k_{{MC}}={:.5f}$, $k_{{RR}}={:.5f}$, diff={:.0f} pcm'.format(tallyName_RR, max_error, min_error, rmse, meanErr, tallyName_MC, keff_MC, keff_RR, 1e5*(keff_RR-keff_MC)) + '\n'  + quarter_label  + '\n'  + removed_edges_label )
 
   
         plot.savefig(newpath + '/compare_MCRR' + tallyName_RR + '.svg')
@@ -1229,6 +1217,108 @@ def meanError(actual_result, predicted_result, target=None):
     # Calculate the mean squared error (MSE) by taking the mean of the squared differences
     meanError = (np.abs(predicted_result - actual_result)).mean()
     return meanError
+
+
+def visualiseQuarter(value, std, visualise_quarter=False):
+    """Adjust data assuming it is a quarter of the core, reflected in both x and y axes.
+
+    Args:
+        array (np.ndarray): The array to visualise.
+        quarter (str, optional): The quarter to visualise. Defaults to 'top-left'.
+    """
+    
+    if visualise_quarter=='top-right':
+        ## The given array only covers the top-right quarter of the fuel assembly. For visualisation, need to reflect this in the array. Need to 'mask' the central fuel pins.
+        # step 1, double the stats in the centre, and alter the relative uncertainty to reflect this
+        value[0,:] = 2 * value[0,:]
+        value[:, 0] = 2 * value[:, 0]
+
+        std[0,:] = std[0,:] / 2
+        std[:, 0] = std[:, 0] / 2
+
+        # step 2 flip and concatenate
+        value = np.concatenate([ np.flip(value, 0), value])
+        value = np.concatenate([ np.flip(value, 1), value],1)
+        std = np.concatenate([np.flip(std, 0), std])
+        std = np.concatenate([np.flip(std, 1), std],1)
+
+        # now remove the central row and column to avoid duplication
+        midindex = value.shape[0] // 2
+        value = np.delete(value, midindex, 0)
+        value = np.delete(value, midindex, 1)
+        std = np.delete(std, midindex, 0)
+        std = np.delete(std, midindex, 1)
+
+        # step 3 write a label
+        quarter_label = '(visual adjusted for quarter geometry)'
+
+    elif visualise_quarter == 'bottom-right':
+        ## The given array only covers the bottom-right quarter of the fuel assembly. For visualisation, need to reflect this in the array. Need to 'mask' the central fuel pins.
+        # step 1, double the stats in the centre, and alter the relative uncertainty to reflect this
+        value[-1,:] = 2 * value[-1,:]
+        value[:, 0] = 2 * value[:, 0]
+
+        std[-1,:] = std[-1,:] / 2
+        std[:, 0] = std[:, 0] / 2
+
+        # step 2 flip and concatenate
+        value = np.concatenate([ value,np.flip(value, 0) ])
+        value = np.concatenate([ np.flip(value, 1), value],1)
+
+        std = np.concatenate([ std, np.flip(std, 0)])
+        std = np.concatenate([np.flip(std, 1), std],1)
+
+        # now remove the central row and column to avoid duplication
+        midindex = value.shape[0] // 2
+        value = np.delete(value, midindex, 0)
+        value = np.delete(value, midindex, 1)
+        std = np.delete(std, midindex, 0)
+        std = np.delete(std, midindex, 1)
+
+        # step 3 write a label
+        quarter_label = '(visual adjusted for quarter geometry)'
+
+    elif visualise_quarter == 'top-right-only':
+        # Only adjust the values along the centreline.
+
+        value[0,:] = 2 * value[0,:]
+        value[:, 0] = 2 * value[:, 0]
+
+        std[0,:] = std[0,:] / 2
+        std[:, 0] = std[:, 0] / 2
+
+        # step 3 write a label
+        quarter_label = '(visual adjusted for quarter geometry)'
+
+    elif visualise_quarter == 'bottom-right-only':
+        # Only adjust the values along the centreline.
+
+        value[-1,:] = 2 * value[-1,:]
+        value[:, 0] = 2 * value[:, 0]
+
+        std[-1,:] = std[-1,:] / 2
+        std[:, 0] = std[:, 0] / 2
+
+        # step 3 write a label
+        quarter_label = '(visual adjusted for quarter geometry)'
+    else:
+        quarter_label = ""
+    
+    return value, std, quarter_label
+
+
+def removeEdges2D(value, std, remove_edges_2D=False):
+     
+    if remove_edges_2D == 'bottom-right':
+       
+        value = np.copy(value)[:-1,1:]
+        std = np.copy(std)[:-1, 1:]
+        removed_edges_label = '(edge elements removed for bottom-right quarter geometry)'
+
+    elif remove_edges_2D == False:
+        removed_edges_label = ''
+    return value, std, removed_edges_label
+
 
 
 if __name__=='__main__':
