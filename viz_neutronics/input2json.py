@@ -19,6 +19,9 @@
 
 import re
 import json
+from collections import defaultdict
+
+
 def parse_text_to_dict(filename):
     """Turns the SCONE input file format into a Python-readable dictionary
 
@@ -126,6 +129,42 @@ def dict2obj(dict1):
     # using json.loads method and passing json.dumps
     # method and custom object hook as arguments
     return json.loads(json.dumps(dict1), object_hook=obj)
+
+
+def parse_mat_to_dict(filename):
+
+    with open(filename) as f:
+        text = f.read()
+    data = defaultdict(list)
+
+    # Pattern for lines like:
+    # VAR_NAME (idx, [1: 20]) = 'value' ;
+    pattern = re.compile(r"(\w+)\s+\(idx,.*?\)\s+=\s+(.+?);")
+
+    for line in text.splitlines():
+        match = pattern.match(line.strip())
+        if match:
+            key, value = match.groups()
+
+            # Attempt to clean up the value:
+            value = value.strip()
+
+            # Handle string values:
+            if value.startswith("'") and value.endswith("'"):
+                value = value.strip("'")
+            # Handle arrays in square brackets:
+            elif value.startswith("[") and value.endswith("]"):
+                value = [float(x) for x in value.strip("[]").split()]
+            # Handle single numbers:
+            else:
+                try:
+                    value = float(value)
+                except ValueError:
+                    pass  # leave as string if not a number
+
+            data[key].append(value)
+
+    return dict(data)
 
 
 

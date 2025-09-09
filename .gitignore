@@ -37,3 +37,4 @@ nuclearDensityOutputs.txt
 
 # a SCONE input file
 inputs/SimpleSlab_MC
+inputs/
