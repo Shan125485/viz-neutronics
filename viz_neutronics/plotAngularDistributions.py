@@ -3,124 +3,12 @@ import pandas as pd
 import matplotlib.pyplot as plot
 
 
-def plot_polar_Fe(csv_filename, mode='COM'):
-    df = pd.read_csv('inputs/' + csv_filename + '.csv')
-    print(df.columns)
-    print(df)
 
-    # theta_COM =np.deg2rad(df[['scatter angle (COM)']]).transpose()[:].to_numpy()[0,:]
-    # theta_LAB = np.deg2rad(df[['scatter angle (LAB)']]).transpose()[:].to_numpy()[0,:]
-
-    if mode == 'LAB':
-        print('LAB')
-        theta = np.deg2rad(df[['scatter angle (LAB)']]).transpose()[:].to_numpy()[0,:]
-        
-    elif mode =='COM':
-        print('COM')
-        theta =np.deg2rad(df[['scatter angle (COM)']]).transpose()[:].to_numpy()[0,:]
-
-    theta = np.concatenate((theta, np.flip(-theta)))
-   
-    r_high_E = df['E= 1.000069 MeV - angular differential XS (b/sr)']
-    r_low_E = df['E=1 eV - Angular  differential XS (b/sr)']
-
-    r_high_E= np.concatenate((r_high_E, np.flip(r_high_E)))
-    r_low_E= np.concatenate((r_low_E, np.flip(r_low_E)))
-
-    print(theta.shape)
-    fig, ax = plot.subplots(subplot_kw={'projection': 'polar'})
-    # ax.plot(theta,r_low_E, label = 'LAB, 1 eV' )
-    # plot.fill_between(theta, r_low_E, alpha=0.2)
-    ax.plot(theta,r_high_E, label = 'LAB, 1 MeV' )
-    ax.set_ylabel('barns/sr',loc='bottom')
-
-    ax.grid(False)
-    plot.fill_between(theta, r_high_E, alpha=0.5)
-    
-    # fig.legend()
-
-    # plot.title(csv_filename + ' angular differential cross sections')
-    plot.savefig('outputs/' + csv_filename + '_' +mode + '_polar_plot.svg')
-
-def plot_polar_O(csv_filename, mode='LAB'):
-    df = pd.read_csv('inputs/'+ csv_filename +'.csv')
-    print(df.columns)
-   
-
-    # theta_COM =np.deg2rad(df[['scatter angle (COM)']]).transpose()[:].to_numpy()[0,:]
-    # theta_LAB = np.deg2rad(df[['scatter angle (LAB)']]).transpose()[:].to_numpy()[0,:]
-    if mode == 'LAB':
-        print('LAB')
-        theta = np.deg2rad(df[['scatter angle (LAB)']]).transpose()[:].to_numpy()[0,:]
-        
-    elif mode =='COM':
-        print('COM')
-        theta =np.deg2rad(df[['scatter angle (COM)']]).transpose()[:].to_numpy()[0,:]
-   
-    # concatenate 
-    theta = np.concatenate((theta, np.flip(-theta)))
-    
-    # print(theta_LAB)
-
-    r_high_E = df['E= 1MeV - angular differential XS (b/sr)']
-    r_low_E = df['E=100 eV - Angular differential XS (b/sr)2']
-
-    r_high_E= np.concatenate((r_high_E, np.flip(r_high_E)))
-    r_low_E= np.concatenate((r_low_E, np.flip(r_low_E)))
-
-    fig, ax = plot.subplots(subplot_kw={'projection': 'polar'})
-    ax.plot(theta,r_low_E, label = 'LAB, 1 eV' )
-    plot.fill_between(theta, r_low_E, alpha=0.2)
-    ax.plot(theta,r_high_E, label = 'LAB, 1 MeV' )
-    ax.set_ylabel('barns/sr',loc='bottom')
-
-    ax.grid(True)
-    plot.fill_between(theta, r_high_E, alpha=0.5)
-    
-    fig.legend()
-
-    plot.title(csv_filename + ' angular differential cross sections')
-    plot.savefig('outputs/' + csv_filename + '_' +mode + '_polar_plot.svg')
-
-def plot_polar_H(csv_filename, mode='LAB'):
-    df = pd.read_csv('inputs/'+csv_filename + '.csv')
-    print(df.columns)
-   
-
-    if mode == 'LAB':
-        theta = np.deg2rad(df[['scatter angle (LAB)']]).transpose()[:].to_numpy()[0,:]
-        
-    elif mode =='COM':
-        print('COM')
-        theta =np.deg2rad(df[['scatter angle (COM)']]).transpose()[:].to_numpy()[0,:]
-        print(theta)
-    theta = np.concatenate((theta, np.flip(-theta)))
-    print(theta)
-        
-    r_high_E = df['E= 1 MeV - angular differential XS (b/sr)']
-    r_low_E = df['E=1 eV - Angular  differential XS (b/sr)']
-
-    r_high_E= np.concatenate((r_high_E, np.flip(r_high_E)))
-    r_low_E= np.concatenate((r_low_E, np.flip(r_low_E)))
-
-    print(theta.shape)
-    fig, ax = plot.subplots(subplot_kw={'projection': 'polar'})
-    ax.plot(theta,r_low_E, label = mode+', 1 eV' )
-    plot.fill_between(theta, r_low_E, alpha=0.2)
-    ax.plot(theta,r_high_E, label = mode+', 1 MeV' )
-    ax.set_ylabel('barns/sr',loc='bottom')
-
-    ax.grid(True)
-    plot.fill_between(theta, r_high_E, alpha=0.5)
-    
-    fig.legend()
-
-    plot.title(csv_filename + ' angular differential cross sections')
-    plot.savefig('outputs/' + csv_filename + '_' +mode + '_polar_plot.svg')
 
 def plot_polar_energy(csv_filename, mode='LAB'):
     df = pd.read_csv('inputs/' + csv_filename + '.csv')
-    print(df.columns)
+    output_filename = 'outputs/' + csv_filename + '_' +mode + '_energy_angle.svg'
+
     if mode == 'LAB':
         theta = np.deg2rad(df[['scatter angle (LAB)']]).transpose()[:].to_numpy()[0,:]
         
@@ -143,88 +31,90 @@ def plot_polar_energy(csv_filename, mode='LAB'):
 
     
     # fig.legend()
-
+    
     # plot.title(csv_filename + ' energy change angular distribution')
-    plot.savefig('outputs/' + csv_filename + '_' +mode + '_energy_angle.svg')
+    plot.savefig(output_filename)
+    print('Saved figure to ' + output_filename)
+
+def theta2mu(theta_rad):
+    """Convert angle in radians to cosine of angle"""
+    return np.cos(theta_rad)
+
+def calc_legendre_poly(mu, Pn_order = 0):
+    """Takes in cosine of angle and returns arrays of the legendre polynomials of the given PN_order.
+    Takes an integer order Pn_order up to Pn=4"""
+    N = Pn_order
+    if N >4:
+        raise ValueError('Legendre polynomial order greater than 4 not implemented')
+    elif N<0:
+        raise ValueError('Legendre polynomial order must be non-negative')
+    elif N==0:
+        P0 = np.ones_like(mu)
+        return P0
+    elif N==1:
+        P1 = mu
+        return P1
+    elif N==2:
+        P2 = 0.5 * (3 * mu**2 - 1)
+        return P2
+    elif N==3:
+        P3 = 0.5 * (5 * mu**3 - 3 * mu)
+        return P3
+    elif N==4:
+        P4 = (35 * mu**4 - 30 * mu**2 + 3) / 8
+        return P4
+    else:
+        raise ValueError('Legendre polynomial order must be an integer between 0 and 4')
 
 
-def plot_legendre(csv_filename):
-    # check here https://demonstrations.wolfram.com/PolarPlotsOfLegendrePolynomials/
+def legendre_for_plotting(theta):
+    theta_for_plotting = np.where(theta<0, -theta , theta) # reflect negative theta to positive side for plotting
+    mu = theta2mu(-theta_for_plotting)
+    print(mu)
+    P0, P1, P2, P3, P4 = calc_legendre_poly(mu)
+    return P0, P1, P2, P3, P4
 
-    df = pd.read_csv('inputs/' + csv_filename + '.csv')
-    print(df.columns)
-   
 
-    mu = df['cosine (COM)']
-    theta =np.deg2rad(df[['scatter angle (COM)']]).transpose()[:].to_numpy()[0,:]
-    
-    
 
-    P0=df['P0']
-    P1=df['P1']
-    P2=df['P2']
-    P3=df['P3']
-    P4=df['P4']
+def plot_legendre(npoints=500, Pn_order_list=[0,1,2,3,4]):
+    """Plots the Legendre polynomials in polar coordinates up to N=4. Saved in outputs file.
+    For reference, check here: https://demonstrations.wolfram.com/PolarPlotsOfLegendrePolynomials/
 
-    
-    # correct for negative numbers
+    Args:
+        npoints (int, optional): The resolution of the plot - how many angles to plot between mu =-1 and mu=1. Defaults to 500.
+        Pn_order_list (list, optional): List of integers between 0 and 4 which give the order of the Legendre functions to be plotted, . Defaults to [0,1,2,3,4].
+    """
 
-    theta1 = np.where(P1<0,theta + np.pi , theta)
-    P1 = np.where(P1<0,-P1,P1)
+    output_filename = 'outputs/'  + 'legendre_' + str(Pn_order_list)+ '_polar_plot.svg'
 
-    theta2 = np.where(P2<0,theta + np.pi , theta)
-    P2 = np.where(P2<0,-P2,P2)
+    mu = np.linspace(-1,1,npoints)
+    theta = np.arccos(mu)  # theta in radians from 0 to pi
 
-    theta3 = np.where(P3<0,theta + np.pi , theta)
-    P3 = np.where(P3<0,-P3,P3)
 
-    theta4 = np.where(P4<0,theta + np.pi , theta)
-    P4 = np.where(P4<0,-P4,P4)
-
-    # flip and concatenate
-    theta = np.concatenate((theta, np.flip(-theta)))
-    theta1 = np.concatenate((theta1, np.flip(-theta1)))
-    theta2 = np.concatenate((theta2, np.flip(-theta2)))
-    theta3 = np.concatenate((theta3, np.flip(-theta3)))
-    theta4 = np.concatenate((theta4, np.flip(-theta4)))
-    P0= np.concatenate((P0, np.flip(P0)))
-    P1= np.concatenate((P1, np.flip(P1)))
-    P2= np.concatenate((P2, np.flip(P2)))
-    P3= np.concatenate((P3, np.flip(P3)))
-    P4= np.concatenate((P4, np.flip(P4)))
-    
-    
     fig, ax = plot.subplots(subplot_kw={'projection': 'polar'})
-    # ax.set_ylim(0,1)
-
-    # ax.plot(theta,P0, label = 'P0' )
-    # plot.fill_between(theta, P0, alpha=0.5)
-
-    ax.plot(theta2,P2, label = 'P1' )
-    plot.fill_between(theta2, P2, alpha=0.5)
-    
-
-    # ax.plot(theta1,P1, label = 'P1' )
-    # plot.fill_between(theta1, P1, alpha=0.5)
-
-    # ax.plot(theta2,P2, label = 'P2' )
-    # plot.fill_between(theta2, P2, alpha=0.6)
    
-    # ax.plot(theta3,P3, label = 'P3' )
-    # plot.fill_between(theta3, P3, alpha=0.7)
+    for N in Pn_order_list:
+        # Calculate Legendre polynomial for this order
+        Pn = calc_legendre_poly(mu, N)
 
-    # ax.plot(theta4,P4, label = 'P4' )
-    # plot.fill_between(theta4, P4, alpha=0.8)
-   
+        # Where there are negative values of Pn, reflect theta to the other side and make Pn positive for plotting
+        theta_plot = np.where(Pn<0, theta+np.pi, theta) 
+        Pn_plot = np.where(Pn<0,-Pn,Pn) 
 
-    # ax.grid(True)
+        # reflect to negative theta side for full polar plot
+        theta_plot = np.concatenate((theta_plot, np.flip(-theta_plot)))
+        Pn_plot = np.concatenate((Pn_plot, np.flip(Pn_plot)))
+        
+        # Plot and label
+        ax.plot(theta_plot, Pn_plot, label = 'P'+str(N) )
+        plot.fill_between(theta_plot, Pn_plot, alpha=0.6)
+
     ax.grid(False)
 
-    
-    # fig.legend()
-
-    # plot.title(csv_filename + ' angular differential cross sections')
-    plot.savefig('outputs/' + csv_filename + '_' + '_polar_plot.svg')
+    fig.legend()
+    plot.title('Legendre Polynomials Polar Plot')
+    plot.savefig(output_filename)
+    print('Saved figure to ' + output_filename)
 
 
 
@@ -232,13 +122,7 @@ def plot_legendre(csv_filename):
 
 
 if __name__=="__main__":
-    # plot_polar_Fe('Fe-56', mode='COM')
-    # plot_polar_Fe('Fe-56', mode='LAB')
-    # plot_polar_O('O-16', mode='COM')
-    # plot_polar_O('O-16', mode='LAB')
-    # plot_polar_H('H-1', mode='COM')
-    # plot_polar_H('H-1', mode='LAB')
-    plot_legendre('legendre')
+    plot_legendre(npoints=500, Pn_order_list=[0,2,4])
     # plot_polar_energy('H-1', mode='LAB')
     # plot_polar_energy('Fe-56')
     # plot_polar_energy('O-16')
