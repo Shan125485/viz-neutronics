@@ -5,7 +5,7 @@ setup(
     py_modules=['viz_neutronics'],
     version="0.1",
     packages=find_packages(),
-    install_requires=['numpy', 'matplotlib', 'os', 'json','pandas'],  # Add dependencies here, e.g., ['numpy', 'pandas']
+    install_requires=['numpy', 'matplotlib', 'pandas'],  # Add dependencies here, e.g., ['numpy', 'pandas']
     description="A module for processing neutronics outputs from SCONE",
     author="Shan Tan-Ya",
     author_email="st712@cam.ac.uk",
