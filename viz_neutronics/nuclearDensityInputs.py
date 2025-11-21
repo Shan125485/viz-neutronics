@@ -95,8 +95,9 @@ Cr = {'Mr': 52,'wtPerc': wtPercCr}
 
 
 #### water at 300C
-# water_temp = 312.7 # Celsius
-water_temp = 293 # Celsius
+water_temp = 312.7 # Celsius
+# water_temp = 293 # Celsius
+
 
 # Calculation for water density based on fixed reference of 0.7 g/cm^3 aat 300C
 water_temp = water_temp + 273 # Kelvin
@@ -114,10 +115,11 @@ PPM = 1175
 # PPM = 975 # For BEAVRS https://bpb-us-e1.wpmucdn.com/sites.mit.edu/dist/9/643/files/2017/01/BEAVRS_2.0.2_spec.pdf
 B_10 = {"Mr": 10, "atPerc": 20}
 B_11 = {"Mr": 11, "atPerc": 80}
-B = {"B-10": B_10, "B-11": B_11, 'wtPerc': 1175 / 1e6}
+B = {"B-10": B_10, "B-11": B_11, 'wtPerc': PPM / 1e6}
 H2O = {'O': O, 'H': H,  'wtPerc': 1}
 
 H2O_boronated = {'H2O': H2O, 'B': B, 'density': waterDensity}
+
 input = H2O_boronated
 
 ## steel for RPV ### ASME A508 Grade 3   https://cdn.standards.iteh.ai/samples/28504/748d0804e90c4bc9ace68144efbd9b03/ASTM-A508-A508M-03.pdf
@@ -155,21 +157,31 @@ volUO2 = 1- volWater #   # In the pin cell, what fraction of the total area does
 UO2_in_refl_model = {  "density": uo2_density, "U": U, "O in UO2": O_in_UO2,'wtPerc': volUO2 }
 H2O_in_refl_model = { 'O': O, 'H': H,  'density': waterDensity , 'wtPerc': volWater}
 
+
 # input = {'UO2': UO2_in_refl_model}
 # input = {'H2O': H2O_in_refl_model }
 
 ### REFLECTOR material
 
-# volSteel = 0.1  # Case 1, 10% steel (by volume)
-volSteel = 0.9  # Case 2, 90% steel (by volume)
+volSteel = 0.1  # Case 1, 10% steel (by volume)
+# volSteel = 0.9  # Case 2, 90% steel (by volume)
+# volSteel = 1  # Case 3, 100% steel (by volume)
+# volSteel = 0.956  # Case 4, 95.6% steel (by volume) This is the EPR reflector proportion
 
-volWater = 1- volSteel
+volWater = 1 - volSteel
 
-H2O = {'O': O, 'H': H,  'density': volWater * waterDensity }
-steel = {'Fe': Fe,'C': carbon, 'Mn': manganese, 'Si': silicon, 'Ni': nickel, 'Cr': chromium, 'Mo': molybdenum, 'density':volSteel * steelDensity }
+# H2O_smeared = {'O': O, 'H': H,  'density': volWater * waterDensity }
 
-# input = H2O
-# input = steel
+H2O_boronated_smeared = {'H2O': H2O,  'B': B, 'density': volWater * waterDensity }
+
+steel_smeared = {'Fe': Fe,'C': carbon, 'Mn': manganese, 'Si': silicon, 'Ni': nickel, 'Cr': chromium, 'Mo': molybdenum, 'density':volSteel * steelDensity }
+
+
+
+# input = H2O_smeared
+input = H2O_boronated_smeared
+# input = steel_smeared
+
 
 
 
