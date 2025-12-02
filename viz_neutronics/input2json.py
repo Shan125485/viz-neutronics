@@ -2,7 +2,7 @@
 # Code to convert between various filetypes relevant to SCONE
 
 
-# Example workflow for reading SONCE intput files in Python:
+# Example workflow for reading SCONE intput files in Python:
 # text_file = 'case1_template.txt'  # replace with your filename
 # json_file = 'case1_template.json'
 
