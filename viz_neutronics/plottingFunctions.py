@@ -345,14 +345,14 @@ def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', respons
     keff, stdKeff = findKeffMC(outputFileMC) # extract keff
 
     # symmetry check
-    print('MC value symmetry check:')
-    value_MC_flip = np.flip(value,0)
-    print(value_MC_flip)
-    print(100*(value_MC_flip - value_MC_flip.T)/value_MC_flip)
+    # print('MC value symmetry check:')
+    # value_MC_flip = np.flip(value,0)
+    # print(value_MC_flip)
+    # print(100*(value_MC_flip - value_MC_flip.T)/value_MC_flip)
 
 
-    print('MC symmetry check:')
-    print(np.allclose(value_MC_flip, value_MC_flip.T, rtol=1e-3, atol=1e-3))
+    # print('MC symmetry check:')
+    # print(np.allclose(value_MC_flip, value_MC_flip.T, rtol=1e-3, atol=1e-3))
 
     value, std, removed_edges_label = removeEdges2D(value, std, remove_edges_2D=remove_edges_2D)
    
@@ -386,8 +386,8 @@ def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', respons
     
     if plotting:
         if layout == 'horizontal':
-            fig, (ax1, ax2) = plot.subplots(1,2)
-            # fig, ax1 = plot.subplots() # TEMP
+            # fig, (ax1, ax2) = plot.subplots(1,2)
+            fig, ax1 = plot.subplots() # TEMP
         elif layout == 'vertical':
             fig, (ax1, ax2) = plot.subplots(2,1)
         
@@ -405,13 +405,13 @@ def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', respons
             # val_plot = ax1.imshow(value_plot, cmap='viridis', vmax=vmax, vmin=vmin, origin='lower', aspect=aspect_ratio)
             val_plot = ax1.imshow(value_plot, cmap='magma', vmax=vmax, vmin=vmin, origin='lower', aspect=aspect_ratio)
             # uncertainty_plot = ax2.imshow(std_plot, cmap='Reds', vmax=vmax_unc, vmin=vmin_unc, origin='lower', aspect=aspect_ratio)
-            uncertainty_plot = ax2.imshow(std_plot, cmap='Greens', vmax=vmax_unc, vmin=vmin_unc, origin='lower', aspect=aspect_ratio)
+            # uncertainty_plot = ax2.imshow(std_plot, cmap='Greens', vmax=vmax_unc, vmin=vmin_unc, origin='lower', aspect=aspect_ratio)
             fig.colorbar(val_plot, ax=ax1).minorticks_on()
-            fig.colorbar(uncertainty_plot, ax=ax2).minorticks_on()
+            # fig.colorbar(uncertainty_plot, ax=ax2).minorticks_on()
 
-        ax1.set_title('Fission rate') # TEMP
-        # ax1.set_title('Value \nNormalised by the mean\n of {} values'.format(normalise_by_mean))
-        ax2.set_title('Standard deviation\n(relative uncertainty)')
+        # ax1.set_title('Fission rate') # TEMP
+        ax1.set_title('Value \nNormalised by the mean\n of {} values'.format(normalise_by_mean))
+        # ax2.set_title('Standard deviation\n(relative uncertainty)')
 
         fig.suptitle('Monte Carlo ' + tallyName + ', $k_{{eff}}$={:.5f} +/- {:.0f} pcm'.format(keff, 1e5 * stdKeff) + '\n'  + quarter_label  + '\n'  + removed_edges_label )
     
@@ -678,7 +678,7 @@ def plotSpatialTallyCompare_MCRR(outputFileMC, outputFileRR, tallyName_MC, tally
     min_error = np.min(rel_diff_for_max)
     max_abs_err = np.max(np.abs([max_error, min_error]))
 
-    rmse = rmsError(value_MC, value_RR)
+    rmse = rmsError(value_MC, value_RR, relative_to='max_value')
     meanErr = meanError(value_MC, value_RR)
     # max_error = np.max(np.abs(rel_diff))
 
@@ -807,7 +807,7 @@ def plotSpatialTallyCompare_MCMC(outputFileMC1, outputFileMC2, tallyName_MC1, ta
     min_error = np.min(rel_diff_for_max)
     max_abs_err = np.max(np.abs([max_error, min_error]))
 
-    rmse = rmsError(value1, value2)
+    rmse = rmsError(value1, value2, relative_to='max_value')
     meanErr = meanError(value1, value2)
     # max_error = np.max(np.abs(rel_diff))
 
@@ -819,7 +819,8 @@ def plotSpatialTallyCompare_MCMC(outputFileMC1, outputFileMC2, tallyName_MC1, ta
 
     if plotting:
         if orientation == 'horizontal':
-            fig, (ax1, ax2) = plot.subplots(1,2)
+            # fig, (ax1, ax2) = plot.subplots(1,2)
+            fig, ax1 = plot.subplots() # TEMP
         elif orientation == 'vertical':
             fig, (ax1, ax2) = plot.subplots(2,1)
         # check dimension:
@@ -857,13 +858,14 @@ def plotSpatialTallyCompare_MCMC(outputFileMC1, outputFileMC2, tallyName_MC1, ta
         
         else:
             val_plot = ax1.imshow(rel_diff, cmap='RdBu_r', vmax=max_abs_err, vmin=-max_abs_err, origin='lower', aspect=aspect_ratio)
+            # val_plot = ax1.imshow(rel_diff, cmap='viridis', origin='lower', aspect=aspect_ratio)
 
-            uncertainty_plot = ax2.imshow(rel_diff_unc, cmap='Reds', origin='lower', aspect=aspect_ratio)
+            # uncertainty_plot = ax2.imshow(rel_diff_unc, cmap='Reds', origin='lower', aspect=aspect_ratio)
             fig.colorbar(val_plot, ax=ax1).minorticks_on()
-            fig.colorbar(uncertainty_plot, ax=ax2).minorticks_on()
+            # fig.colorbar(uncertainty_plot, ax=ax2).minorticks_on()
 
         ax1.set_title('Value \nNormalised by the mean\n of {} values'.format(normalise_by_mean))
-        ax2.set_title('Standard deviation\n(relative uncertainty)')
+        # ax2.set_title('Standard deviation\n(relative uncertainty)')
 
       
 
@@ -905,7 +907,7 @@ def plotSpatialTallyCompare_MCMG(outputFileCE, outputFileMG, tallyName_CE, tally
     min_error = np.min(rel_diff_for_max)
     max_abs_err = np.max(np.abs([max_error, min_error]))
 
-    rmse = rmsError(value_CE, value_MG)
+    rmse = rmsError(value_CE, value_MG, relative_to='max_value')
     meanErr = meanError(value_CE, value_MG)
  
 
@@ -1021,7 +1023,7 @@ def plotFissionRatesCompareMC_RR(outputFileMC,outputFileRR, target=100):
     rel_diff_for_max = np.where(fissRateMC< 1e-16,0, rel_diff)
     max_error = np.max(np.abs(rel_diff_for_max))
 
-    rmse = rmsError(fissRateMC, fissRateRR, target)
+    rmse = rmsError(fissRateMC, fissRateRR, target, relative_to='max_value')
     meanErr = meanError(fissRateMC, fissRateRR, target)
     # max_error = np.max(np.abs(rel_diff))
 
@@ -1052,7 +1054,7 @@ def plotFissionRatesCompare_radial_MC_RR(outputFileMC,outputFileRR, target=100):
     rel_diff = (np.array(fissRateRR) - np.array(fissRateMC)) / np.array(fissRateMC)
     rel_diff = np.nan_to_num(rel_diff) * 100
     
-    rmse = rmsError(fissRateMC, fissRateRR, target)
+    rmse = rmsError(fissRateMC, fissRateRR, target, relative_to='max_value')
     max_error = np.max(np.abs(rel_diff))
 
 
@@ -1193,18 +1195,24 @@ def normalise(array, target):
 
     return array_norm
 
-def rmsError(actual_result, predicted_result, target=None):
+def rmsError(actual_result, predicted_result, target=None, relative_to=None):
+    
 
     if target is not None:
         # normalise both results
         actual_result = normalise(actual_result, target)
         predicted_result = normalise(predicted_result, target)
 
+    # print(predicted_result)
     # Calculate the mean squared error (MSE) by taking the mean of the squared differences
     meanSquaredError = ((predicted_result - actual_result) ** 2).mean()
+    
 
-    # Calculate the RMSE by taking the square root of the MSE
-    rmse = np.sqrt(meanSquaredError) / np.max(actual_result)
+    if relative_to == 'max_value':
+        # Calculate the RMSE by taking the square root of the MSE
+        rmse = np.sqrt(meanSquaredError) / np.max(actual_result)
+    else:
+        rmse = np.sqrt(meanSquaredError) #/ relative_to # if relative_to is a floar
     return rmse
 
 def meanError(actual_result, predicted_result, target=None):
