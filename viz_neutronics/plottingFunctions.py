@@ -358,10 +358,6 @@ def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', respons
    
     value, std, quarter_label = visualiseQuarter(value, std, visualise_quarter=visualise_quarter)
 
-   
-    
-    
-
     # try to remove data from plot if the tally is 0
     value_plot = np.copy(np.where(value < 1e-18, np.nan, value))
     std_plot = np.copy(np.where(value < 1e-18, np.nan, std))
@@ -417,7 +413,7 @@ def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', respons
     
   
         plot.savefig(newpath + '/' + tallyName + str(int(response_index)) + '_MC.svg')
-        
+        plot.close()
 
     return value_plot, std_plot
 
@@ -604,7 +600,7 @@ def plotSpatialTallyCompare_MCRR(outputFileMC, outputFileRR, tallyName_MC, tally
                                 Defaults to False.
         i (int, optional): Starting index for slicing a 1D output array. Defaults to 0.
     """
-     # make an output folder to store outputs
+    # make an output folder to store outputs
     newpath = 'outputs'
     if not os.path.exists(newpath):
         os.makedirs(newpath)
@@ -1203,7 +1199,12 @@ def rmsError(actual_result, predicted_result, target=None, relative_to=None):
         actual_result = normalise(actual_result, target)
         predicted_result = normalise(predicted_result, target)
 
-    # print(predicted_result)
+    print('Applies a mask to remove NaN values for RMSE calculation.')
+    mask = ~(np.isnan(actual_result) | np.isnan(predicted_result))
+    actual_result = actual_result[mask]
+    predicted_result = predicted_result[mask]
+  
+
     # Calculate the mean squared error (MSE) by taking the mean of the squared differences
     meanSquaredError = ((predicted_result - actual_result) ** 2).mean()
     
@@ -1309,8 +1310,10 @@ def visualiseQuarter(value, std, visualise_quarter=False):
 
         # step 3 write a label
         quarter_label = '(visual adjusted for quarter geometry)'
-    else:
+    elif visualise_quarter == False:
         quarter_label = ""
+    else:
+        raise ValueError('visualise_quarter argument must be one of ["top-right", "bottom-right", "top-right-only", "bottom-right-only", False ]')
     
     return value, std, quarter_label
 
@@ -1325,6 +1328,8 @@ def removeEdges2D(value, std, remove_edges_2D=False):
 
     elif remove_edges_2D == False:
         removed_edges_label = ''
+
+
     return value, std, removed_edges_label
 
 
