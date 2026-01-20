@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.interpolate import LinearNDInterpolator
 import json
 import os
 import matplotlib.pyplot as plot
@@ -11,8 +12,9 @@ from viz_neutronics.plottingFunctions import readOutputs, findKeffMC, plotSpatia
 
 def writeSolverToJSON(solver, x_pin, y_pin, z_pin, x_assem, y_assem, z_assem, outputs_filepath : str):
 
+    print('extracting pin power')
     pin_power, x_loc, y_loc = solver.pin_power(z_pin)
-
+    print('Making dictionary')
     dictionary = { # all values are strings so that they get printed into a readable format
         'x_pin': x_pin.tolist(),
         'y_pin': y_pin.tolist(),
@@ -34,9 +36,10 @@ def writeSolverToJSON(solver, x_pin, y_pin, z_pin, x_assem, y_assem, z_assem, ou
         'pin_yloc': y_loc.tolist(),
         'ngroups': solver.ngroups
     }
+    print('dumping to json')
 
     with open(outputs_filepath + 'Solver_output.json', 'w') as f:
-        json.dump(dictionary, f, indent=4)
+        json.dump(dictionary, f)
 
 
 def readSolverFromJSON(outputFile : str, print_output=True):
@@ -93,8 +96,6 @@ def readSolverFromJSON(outputFile : str, print_output=True):
 
 
     return res
-
-
 
 
 def transXS_inscatter(hom_XS : scrb.CrossSection, num_groups : int):
@@ -496,7 +497,7 @@ def plotSpatialParamJSON(outputJSONScarab, paramName, normalise_by_mean='all', v
 
     return value_plot
 
-def plotSpatialParam_CompareNodalMC(outputFileMC, outputFileNodal, tallyName_MC, paramNameNodal, normalise_by_mean='all',  response_index_MC = 0, vmax=None, vmin=None, plotting=True, visualise_quarter_MC=False, visualise_quarter_nodal=False, aspect_ratio=1, indicesNodal = None, mgID_nodal = None):
+def plotSpatialParam_CompareNodalMC(outputFileMC, outputFileNodal, tallyName_MC, paramNameNodal, normalise_by_mean='all',  response_index_MC = 0, vmax=None, vmin=None, plotting=True, visualise_quarter_MC=False, visualise_quarter_nodal=False, aspect_ratio=1, indicesNodal = None, mgID_nodal = None, annotate=False):
     # make an output folder to store outputs
     newpath = 'outputs'
     if not os.path.exists(newpath):
@@ -551,16 +552,22 @@ def plotSpatialParam_CompareNodalMC(outputFileMC, outputFileNodal, tallyName_MC,
         # check dimension:
 
 
-        val_plot = ax1.imshow(rel_diff, cmap='viridis', origin='lower', aspect=aspect_ratio)
+        val_plot = ax1.imshow(rel_diff *100, cmap='rainbow', origin='lower', aspect=aspect_ratio)
 
-        fig.colorbar(val_plot, ax=ax1).minorticks_on()
+        fig.colorbar(val_plot, ax=ax1, label='%').minorticks_on()
+
+        if annotate==True:
+            for (j,i),label in np.ndenumerate(rel_diff):
+                ax1.text(i,j,'{:.2f}'.format(label*100),ha='center',va='center', fontsize=4, color='white')
+                # ax1.annotate('{:.0%}'.format(label), [i,j], ha='center',va='center', fontsize=5.5, color='white')
+
 
 
         ax1.set_title('Value \nNormalised by the mean\n of {} values'.format(normalise_by_mean))
 
       
 
-        fig.suptitle('(RR -MC) / MC: relative difference in {}. \nMax error={:.3%}, min error={:.3%}, \nRMSE={:.3%}.\n$k_{{MC}}={:.5f}$, $k_{{RR}}={:.5f}$, diff={:.0f} pcm'.format(paramNameNodal, max_error, min_error, rmse, keff_MC, keff_nodal, 1e5*(keff_nodal-keff_MC)) + '\n'  + quarter_label  )
+        fig.suptitle('(Nodal -MC) / MC: relative difference in {}. \nMax error={:.3%}, min error={:.3%}, \nRMSE={:.3%}.\n$k_{{MC}}={:.5f}$, $k_{{nodal}}={:.5f}$, diff={:.0f} pcm'.format(paramNameNodal, max_error, min_error, rmse, keff_MC, keff_nodal, 1e5*(keff_nodal-keff_MC)) + '\n'  + quarter_label  )
 
   
         plot.savefig(newpath + '/compare_MCNodal' + paramNameNodal + str(mgID_nodal) + '.svg')
