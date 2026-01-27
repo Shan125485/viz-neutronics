@@ -1,18 +1,28 @@
 
 import json
 import sys
+from pathlib import Path
+from enum import Enum
+from datetime import datetime
+import numpy as np
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 # Constants
 
-L = 6.023e23 # avogadro's constant
-b = 10**-24 # 1 barn in cm^2
+L = 6.023e23  # avogadro's constant
+b = 10**-24  # 1 barn in cm^2
 
 # Classes
 
+
 class obj:
-        # constructor
-        def __init__(self, dict1):
-            self.__dict__.update(dict1)
+    # constructor
+    def __init__(self, dict1):
+        self.__dict__.update(dict1)
+
 
 class results:
     def __init__(self, input):
@@ -20,23 +30,24 @@ class results:
 
         calculateDensity1(self.output)
         calculateMr1(self.output)
-        setAtomicProportions(self.output) # set the top level atomic proportions as the same as the atomic percentage
+        # set the top level atomic proportions as the same as the atomic percentage
+        setAtomicProportions(self.output)
         calculateAtomicProportions(self.output)
 
         # calcuate nuclear density multiplying factor
         factor = self.output.density / self.output.Mr * L * b
         calculateNuclearDensity(self.output, factor)
-        
+
     def display(self):
-        
+
         print('\n\n|||||| DISPLAY |||||||')
         print('\nTop level')
         print(vars(self.output))
-        
+
         level = self.output
         print('\nPrint out levels')
         printLevel(level)
-    
+
     def write_results(self, file_out):
 
         with open(file_out, 'w') as write_file:
@@ -44,11 +55,16 @@ class results:
             print('\n\n|||||| DISPLAY |||||||')
             print('\nTop level')
             print(vars(self.output))
-            
+
             level = self.output
             print('\nPrint out levels')
             printLevel(level)
-           
+
+    def write2json(self, file_out):
+        with open(file_out, 'w') as f:
+            json_format = to_jsonable(self.output)
+            json.dump(json_format, f, indent=2)
+
 
 def printLevel(object):
     subelementNames, subelementlist = subElementsList(object)
@@ -59,89 +75,98 @@ def printLevel(object):
         print(vars(element))
         printLevel(element)
 
-    
+
 def dict2obj(dict1):
     # using json.loads method and passing json.dumps
     # method and custom object hook as arguments
     return json.loads(json.dumps(dict1), object_hook=obj)
 
+
 def calculateDensity1(object):
 
     if checkExists(object, 'density') is False:
         if subElementsExist(object):
-            print('Subelements identified:')
+            logger.info('Subelements identified:')
+
+
             subelementsNames, subelementslist = subElementsList(object)
 
             if checkExistsInList(subelementslist, 'density'):
-                print('Density found in all of', subelementsNames)
-                pass                
+                logger.info('Density found in all of %s', subelementsNames)
+                pass
             else:
                 # need to go through each one and throw an error for the one without Mr
-                print('Missing density somewhere in ', subelementsNames, 'loop through')
+                logger.info('Missing density somewhere in %s loop through',
+                      subelementsNames)
+     
                 for i in range(len(subelementslist)):
                     component = subelementslist[i]
                     name = subelementsNames[i]
-                    print(name)
+                    logger.info(name)
                     if checkExists(component, 'Mr'):
-                        print(' has density ')
+                        logger.info(print(' has density '))
                     else:
-                        print('Does not have density, calculate it')
+                        logger.info('Does not have density, calculate it')
                         calculateDensity1(component)
 
             if checkExistsInList(subelementslist, 'wtPerc'):
-                print('Wt% found in all of', subelementsNames)
+                logger.info('Wt%% found in all of %s', subelementsNames)
                 pass
             else:
-                print('Missing wtPerc somewhere in ', subelementsNames, 'loop through')
+                logger.info('Missing wtPerc somewhere in %s loop through',
+                      subelementsNames)
                 # need to go through each one and calculate at% for the one without atperc
                 for i in range(len(subelementslist)):
                     component = subelementslist[i]
                     name = subelementsNames[i]
-                    print(name)
+                    logger.info(name)
                     if checkExists(component, 'wtPerc'):
-                        print('has wt%')                       
+                        logger.info('has wt%%')
                     else:
                         raise ValueError("wt% is missing from a component")
-            
+
             setattr(object, 'density', calculateDensity2(subelementslist))
         else:
             raise ValueError('No sub-elements exist to calculate density')
 
+
 def calculateMr1(object):
     if checkExists(object, 'Mr') is False:
         if subElementsExist(object):
-            print('Subelements identified:')
+            logger.info('Subelements identified:')
             subelementsNames, subelementslist = subElementsList(object)
-            print(subelementsNames)
+            logger.info(subelementsNames)
 
             if checkExistsInList(subelementslist, 'Mr'):
-                print('Mr found in all of', subelementsNames)
-                pass                
+                logger.info('Mr found in all of %s', subelementsNames)
+                pass
             else:
                 # need to go through each one and throw an error for the one without Mr
-                print('mising Mr somewhere in ', subelementsNames, 'loop through')
+                logger.info('mising Mr somewhere in %s loop through',
+                      subelementsNames)
                 for i in range(len(subelementslist)):
                     component = subelementslist[i]
                     name = subelementsNames[i]
-                    print(name)
+                    logger.info(name)
                     if checkExists(component, 'Mr'):
-                        print(' has Mr ')
+                        logger.info(' has Mr ')
                     else:
-                        print('Does not have Mr, calculate it')
+                        logger.info('Does not have Mr, calculate it')
                         calculateMr1(component)
-            
+
             if checkExistsInList(subelementslist, 'atPerc'):
-                print('At% found in all of', subelementsNames)
+                logger.info('At%% found in all of %s', subelementsNames)
                 pass
             else:
-                print('Missing atPerc somewhere in ', subelementsNames, 'loop through')
+                logger.info('Missing atPerc somewhere in %s loop through',
+                      subelementsNames)
                 # need to go through each one and calculate at% for the one without atperc
                 for i in range(len(subelementslist)):
                     component = subelementslist[i]
                     name = subelementsNames[i]
-                    print(name)
+                    logger.info(name)
                     if checkExists(component, 'atPerc'):
-                        print('has at%')                       
+                        logger.info('has at%%')
                     else:
                         calculateAtPerc(component, object)
 
@@ -149,17 +174,20 @@ def calculateMr1(object):
         else:
             raise ValueError('No sub-elements exist to calculate Mr')
 
+
 def calculateDensity2(componentsList):
     density = 0
     for component in componentsList:
         density += component.density * component.wtPerc
-    return density 
+    return density
+
 
 def calculateMr2(componentsList):
     Mr = 0
     for component in componentsList:
         Mr += component.Mr * component.atPerc
     return Mr
+
 
 def calculateAtPerc(specificComponent, object):
     subelementsNames, subelementslist = subElementsList(object)
@@ -172,20 +200,21 @@ def calculateAtPerc(specificComponent, object):
             denominator += component.wtPerc / component.Mr
 
         else:
-            raise ValueError("wt% not found for sub-components to calculate at%")
+            raise ValueError(
+                "wt% not found for sub-components to calculate at%")
     atPerc = numerator / denominator
     setattr(specificComponent, 'atPerc', atPerc)
-    print('calculated at%', atPerc)
+    logger.info('calculated at%% %s', atPerc)
 
-    
 
 def checkExists(object, attribute):
     if parseInput(object, str(attribute)):
-        print('found {}'.format(str(attribute)))
+        logger.info('found {}'.format(str(attribute)))
         return True
     else:
-        print('No {} found'.format(str(attribute)))
+        logger.info('No {} found'.format(str(attribute)))
         return False
+
 
 def checkExistsInList(list, attribute):
     for object in list:
@@ -194,30 +223,33 @@ def checkExistsInList(list, attribute):
         else:
             pass
     return True
-    
+
+
 def parseInput(object, key: str):
     if hasattr(object, key):
         if getattr(object, key) is None:
             return False
         else:
             return True
-    else: 
-        setattr(object,key,None)
+    else:
+        setattr(object, key, None)
         return False
+
 
 def subElementsExist(object):
     for attribute in vars(object):
-        if isinstance(getattr(object,attribute), obj):
-            print('found subelement', attribute)
+        if isinstance(getattr(object, attribute), obj):
+            logger.info('found subelement %s', attribute)
             return True
 
+
 def subElementsList(object):
-    list =[]
+    list = []
     listnames = []
     for attribute in vars(object):
-        if isinstance(getattr(object,attribute), obj):
+        if isinstance(getattr(object, attribute), obj):
             listnames.append(attribute)
-            list.append(getattr(object,attribute))
+            list.append(getattr(object, attribute))
     return listnames, list
 
 
@@ -227,34 +259,54 @@ def calculateNuclearDensity(object, factor):
     for i in range(len(subelementlist)):
         name = subelementNames[i]
         element = subelementlist[i]
-        print(name)
+        logger.info(name)
         nuclearDensity = factor * element.atProp
-        setattr(element, 'nuclearDensity', nuclearDensity)
+        setattr(element, 'nuclearDensity', float(f"{nuclearDensity:8g}"))
         calculateNuclearDensity(element, factor)
 
+
 def calculateAtomicProportions(object):
-    
+
     subelementNames, subelementlist = subElementsList(object)
     for i in range(len(subelementlist)):
         name = subelementNames[i]
         element = subelementlist[i]
         if checkExists(element, 'atProp') is False:
-            print(name)
+            logger.info(name)
             atProp = element.atPerc * object.atProp
             setattr(element, 'atProp', atProp)
-            
+
         calculateAtomicProportions(element)
 
-     
+
 def setAtomicProportions(object):
     # for the top level
     subelementNames, subelementlist = subElementsList(object)
-    print("Set the atomic proportion of top level")
+    logger.info("Set the atomic proportion of top level")
     for i in range(len(subelementlist)):
         name = subelementNames[i]
         element = subelementlist[i]
-        print(name)
+        logger.info(name)
         setattr(element, 'atProp', element.atPerc)
 
 
+# from CHATGPT
 
+
+def to_jsonable(obj):
+    """
+    Convert multi-level object into a Python-readable json
+    """
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    if isinstance(obj, (Path, datetime)):
+        return str(obj)
+    if isinstance(obj, Enum):
+        return obj.name
+    if hasattr(obj, "__dict__"):
+        return {k: to_jsonable(v) for k, v in vars(obj).items()}
+    if isinstance(obj, dict):
+        return {k: to_jsonable(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [to_jsonable(v) for v in obj]
+    return obj
