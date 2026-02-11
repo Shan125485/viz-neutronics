@@ -3,6 +3,9 @@ import numpy as np
 import matplotlib.pyplot as plot
 from itertools import cycle
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 # run from outside module
 from viz_neutronics.input2json import parse_text_to_dict, save_to_json, stringTuple_to_array, dict2obj
@@ -42,7 +45,7 @@ def readInputs(inputFile):
 
 
 def readOutputs(output_file, print_output=True):
-    print('\n\nLoading {} into an output dictionary'.format(output_file))
+    logger.info('Loading %s into an output dictionary',output_file)
     # returns output JSON object as python dictionary
     with open(output_file) as f:
         outputDict = json.load(f)
@@ -328,7 +331,7 @@ def plotMultiMapTallyMC(outputFileMC, tallyName, response_index=0, normalise_by_
     return value_plot, std_plot
 
 
-def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', response_index=0, vmax=None, vmin=None, vmax_unc=None, vmin_unc=None, plotting=True, visualise_quarter=False, aspect_ratio=1, layout='horizontal', remove_edges_2D=False, average_along_diag=False, newpath='outputs'):
+def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', response_index=0, vmax=None, vmin=None, vmax_unc=None, vmin_unc=None, plotting=True, visualise_quarter=False, aspect_ratio=1, layout='horizontal', remove_edges_2D=False, average_along_diag=False, newpath='outputs', annotate=False, cmap_colour='magma', modelName='', fontsize=2, colour='black', dp=3, tol=1e-16, indices=None):
     """Plots quantity in Cartesian space along with the uncertainty
 
     Args:
@@ -343,7 +346,7 @@ def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', respons
     """
 
     # make an output folder to store outputs
-
+    
     if not os.path.exists(newpath):
         os.makedirs(newpath)
 
@@ -354,6 +357,7 @@ def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', respons
     std = result[..., response_index, 1] / value
 
     keff, stdKeff = findKeffMC(outputFileMC)  # extract keff
+    
 
     # symmetry check
     # print('MC value symmetry check:')
@@ -363,7 +367,10 @@ def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', respons
 
     # print('MC symmetry check:')
     # print(np.allclose(value_MC_flip, value_MC_flip.T, rtol=1e-3, atol=1e-3))
-
+   
+    
+    value = apply_indices(indices, value)
+    std = apply_indices(indices, std)
     value, std, average_along_diag_label = octantSymmetry(
         value, std, average_along_diag)
 
@@ -373,16 +380,8 @@ def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', respons
     value, std, quarter_label = visualiseQuarter(
         value, std, visualise_quarter=visualise_quarter)
 
-    # try to remove data from plot if the tally is 0
-    value_plot = np.copy(np.where(value < 1e-18, np.nan, value))
-    std_plot = np.copy(np.where(value < 1e-18, np.nan, std))
-
     # normalise values
-    value_plot = normalise_plots(value_plot, normalise_by_mean)
-
-    # Turn NaNs back into 0s for plotting
-    value_plot = np.where(np.isnan(value_plot), 0, value_plot)
-    std_plot = np.where(np.isnan(std_plot), 0, std_plot)
+    value = normalise_plots(value, normalise_by_mean, tol=tol)
 
     if plotting:
         if layout == 'horizontal':
@@ -391,35 +390,40 @@ def plotSpatialTallyMC(outputFileMC, tallyName, normalise_by_mean='all', respons
         elif layout == 'vertical':
             fig, (ax1, ax2) = plot.subplots(2, 1)
 
-        if value_plot.ndim < 2:
+        if value.ndim < 2:
             # This is not 2D data, assume 1-dimensional.
-            ax1.plot(value_plot, color='blue')
-            ax2.plot(std_plot, color='red')
+            ax1.plot(value, color='blue')
+            ax2.plot(std, color='red')
 
             ax1.set_xlim(left=0)
             ax2.set_xlim(left=0)
 
         else:
-
-            val_plot = ax1.imshow(value_plot, cmap='magma', vmax=vmax,
+            
+            print('Mask values lower than {:.1e}'.format(tol))
+            values_masked = np.ma.masked_where(value < tol, value)
+            std_masked = np.ma.masked_where(value < tol, std)
+            val_plot = ax1.imshow(values_masked, cmap=cmap_colour, vmax=vmax,
                                   vmin=vmin, origin='lower', aspect=aspect_ratio)
             uncertainty_plot = ax2.imshow(
-                std_plot, cmap='Reds', vmax=vmax_unc, vmin=vmin_unc, origin='lower', aspect=aspect_ratio)
+                std_masked, cmap='Reds', vmax=vmax_unc, vmin=vmin_unc, origin='lower', aspect=aspect_ratio)
             fig.colorbar(val_plot, ax=ax1).minorticks_on()
             fig.colorbar(uncertainty_plot, ax=ax2).minorticks_on()
 
+        ax1 = label_plot(annotate, value, ax1, fontsize=fontsize, color=colour, dp=dp)
+
         ax1.set_title(
-            'Value \nNormalised by the mean\n of {} values'.format(normalise_by_mean))
+            'Value \nNormalised by the mean\n of {} values.\nMax: {:.2f}, Min: {:.2f}'.format(normalise_by_mean, np.max(values_masked), np.min(values_masked)))
         ax2.set_title('Standard deviation\n(relative uncertainty)')
 
         fig.suptitle('Monte Carlo ' + tallyName + ', $k_{{eff}}$={:.5f} +/- {:.0f} pcm'.format(
             keff, 1e5 * stdKeff) + '\n' + quarter_label + '\n' + removed_edges_label + '\n' + average_along_diag_label)
 
-        plot.savefig(newpath + '/' + tallyName +
+        plot.savefig(newpath + '/' + modelName + tallyName +
                      str(int(response_index)) + '_MC.svg')
         plot.close()
 
-    return value_plot, std_plot
+    return value, std
 
 
 def plotSpatialMaterialTallyMC(outputFileMC, tallyName, materialName, normalise_by_mean='all', response_index=0, vmax=None, vmin=None, vmax_unc=None, vmin_unc=None, newpath='outputs'):
@@ -1183,16 +1187,20 @@ def normalise(array, target):
     return array_norm
 
 
-def normalise_plots(value, normalise_by_mean):
-    # now normalise by the mean value of non-zero tallies
+def normalise_plots(value, normalise_by_mean, tol=1e-16):
+
     if normalise_by_mean == 'non-zero':
-        value_no_nan = value[~np.isnan(value)]
-        value_mean = np.mean(value_no_nan)
-        print('Normalising by the mean of non-zero values,', value_mean)
-        value = value / value_mean
+        value = np.where(np.isnan(value), 0, value) # First turn NaNs into 0s
+        masked_non_zero = np.ma.masked_where(value < tol, value) # Then exclude 0s from the calculation
+        logger.debug('Number of non-zero values: %s', masked_non_zero.count())
+        mean_non_zero = np.mean(masked_non_zero)
+        logger.debug('Normalising by the mean of non-zero values, %s', mean_non_zero)
+        value = value / mean_non_zero
     elif normalise_by_mean == 'all':
+        value = np.where(np.isnan(value), 0, value) # Give all cells a value, even NaNs
+        logger.debug('Number of values used to calculate mean: %s', value.shape)
         mean = np.mean(value)
-        print('Normalising by the mean of all values,', mean)
+        logger.debug('Normalising by the mean of all values, %s', mean)
         value = value / mean
     elif normalise_by_mean == None:
         'No normalisation applied'
@@ -1210,20 +1218,30 @@ def rmsError(actual_result, predicted_result, target=None, relative_to=None):
         actual_result = normalise(actual_result, target)
         predicted_result = normalise(predicted_result, target)
 
-    print('Applies a mask to remove NaN values for RMSE calculation.')
+    logger.info('Applies a mask to remove NaN values from both reference and predicted results for RMSE calculation.')
+    starting_len = actual_result.size
     mask = ~(np.isnan(actual_result) | np.isnan(predicted_result))
     actual_result = actual_result[mask]
     predicted_result = predicted_result[mask]
+    logger.info('%s NaN value(s) removed', starting_len - actual_result.size)
+
 
     # Calculate the mean squared error (MSE) by taking the mean of the squared differences
     meanSquaredError = ((predicted_result - actual_result) ** 2).mean()
+    rmse = np.sqrt(meanSquaredError)
 
-    if relative_to == 'max_value':
-        # Calculate the RMSE by taking the square root of the MSE
-        rmse = np.sqrt(meanSquaredError) / np.max(actual_result)
-    else:
-        # / relative_to # if relative_to is a floar
-        rmse = np.sqrt(meanSquaredError)
+    if relative_to == 'max_reference':
+        logger.info('Normalising RMSE by the maximum value of the reference result')
+        rmse = rmse / np.max(actual_result)
+    if relative_to == 'mean_reference':
+        logger.info(
+            'Normalising RMSE by the mean value of the reference result, %s', np.mean(
+                actual_result))
+        rmse = rmse / np.mean(actual_result)
+
+    elif relative_to == None:
+        logger.info(
+            'No normalisation of RMSE applied')
     return rmse
 
 
@@ -1330,7 +1348,7 @@ def visualiseQuarter(value, std, visualise_quarter=False):
     return value, std, quarter_label
 
 
-def plot_MC_results(inputFileMC, outputFileMC, normalise_by_mean=None, visualise_quarter=False, average_along_diag=False, newpath='outputs'):
+def plot_MC_results(inputFileMC, outputFileMC, normalise_by_mean=None, visualise_quarter=False, average_along_diag=False, newpath='outputs', annotate=False, cmap_colour='magma', modelName='', fontsize=2, colour='black', dp=3, tol=1e-16):
     """
     Saves a few key plots for the Monte Carlo result: shannon entropy convergence and fluxes and fission rates tallied by pin and assembly
     """
@@ -1339,23 +1357,23 @@ def plot_MC_results(inputFileMC, outputFileMC, normalise_by_mean=None, visualise
     fluxIndex = 0
     fissIndex = 1
 
-    plotShannon(inputFileMC, outputFileMC)
+    plotShannon(inputFileMC, outputFileMC, newpath=newpath)
 
     # Flux
     # (pins)
     plotSpatialTallyMC(outputFileMC, fissTally_MC_pin, normalise_by_mean=normalise_by_mean, response_index=fluxIndex,
-                       visualise_quarter=visualise_quarter, average_along_diag=average_along_diag, newpath=newpath)
+                       visualise_quarter=visualise_quarter, average_along_diag=average_along_diag, newpath=newpath, annotate=False, cmap_colour=cmap_colour, modelName=modelName, tol=tol)
     # (assemblies)
     plotSpatialTallyMC(outputFileMC, fissTally_MC_assem, normalise_by_mean=normalise_by_mean, response_index=fluxIndex,
-                       visualise_quarter=visualise_quarter, average_along_diag=average_along_diag, newpath=newpath)
+                       visualise_quarter=visualise_quarter, average_along_diag=average_along_diag, newpath=newpath, annotate=annotate, cmap_colour=cmap_colour, fontsize=fontsize, colour=colour, dp=dp, tol=tol)
 
     # Fission rate
     # (pins)
     plotSpatialTallyMC(outputFileMC, fissTally_MC_pin, normalise_by_mean=normalise_by_mean, response_index=fissIndex,
-                       visualise_quarter=visualise_quarter, average_along_diag=average_along_diag, newpath=newpath)
+                       visualise_quarter=visualise_quarter, average_along_diag=average_along_diag, newpath=newpath, annotate=False, cmap_colour=cmap_colour, tol=tol)
     # (assemblies)
     plotSpatialTallyMC(outputFileMC, fissTally_MC_assem, normalise_by_mean=normalise_by_mean, response_index=fissIndex,
-                       visualise_quarter=visualise_quarter, average_along_diag=average_along_diag, newpath=newpath)
+                       visualise_quarter=visualise_quarter, average_along_diag=average_along_diag, newpath=newpath, annotate=annotate, cmap_colour=cmap_colour, fontsize=fontsize, colour=colour, dp=dp, tol=tol)
 
 
 def removeEdges2D(value, std, remove_edges_2D=False):
@@ -1386,6 +1404,27 @@ def octantSymmetry(value, std, average_along_diag=False):
         average_along_diag_label = ''
 
     return value, std, average_along_diag_label
+
+
+def label_plot(annotate, value, ax, fontsize=2, color='black', dp=3):
+    if annotate == True:
+        for (j, i), label in np.ndenumerate(value):
+            ax.text(i, j, f"{label:.{dp}f}", ha='center',
+                    va='center', fontsize=fontsize, color=color)
+    return ax
+
+def apply_indices(indices, value):
+    if indices is None:
+        value = value
+    elif indices is not None and not (isinstance(indices, list) and len(indices) == 2 and all(isinstance(t, tuple) and len(t) == 2 for t in indices)):
+        raise ValueError(
+            "value must be None or a list of two 2-element tuples")
+    else:
+        logger.info('2D slicing applied according to indices %s', indices)
+        value = value[indices[0][0]: indices[0]
+                      [1], indices[1][0]: indices[1][1]]
+        
+    return value
 
 
 if __name__ == '__main__':

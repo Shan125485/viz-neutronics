@@ -1,10 +1,13 @@
-# For ENDFB8 library
 
+import logging
+logger = logging.getLogger(__name__)
+
+# Lookup search for ENDFB8 library ZAID extensions
 
 
 def find_ZAID_ext(temp_C: float):
     temp_K = temp_C + 273
-    
+
     ext_array = ['05', '06', '00', '01', '02', '03', '04']
     temp_array = [0.1, 250, 293.6, 600, 900, 1200, 2500]
 
@@ -22,16 +25,14 @@ def find_ZAID_ext(temp_C: float):
         key=lambda x: abs(x[1] - temp_K)
     )
     ext = ext_array[idx]
+    logger.info('WARNING: Material extension of %s corresponds to a temperature of %s K. Target material temperature is %s K', ext, closest_temp, temp_K)
+    # print('WARNING: Material extension of {} corresponds to a temperature of {} K. Target material temperature is {} K'.format(
+    #     ext, closest_temp, temp_K))
 
-    if abs(temp_K - closest_temp) > 1:  # If the difference is greater than 1 degree
-        print('WARNING: Material extension of {} corresponds to a temperature of {} K. Target material temperature is {} K'.format(
-            ext, closest_temp, temp_K))
-
-    return str(ext)
-
+    return str(ext), closest_temp
 
 
-def find_moder_extension(temp_C : float):
+def find_moder_extension(temp_C: float):
     temp_K = temp_C + 273
 
     # find closest match... from Appendix D of ENDF/B-VIII.0-based ACE files for thermal scattering data [19]
@@ -54,12 +55,8 @@ def find_moder_extension(temp_C : float):
         key=lambda x: abs(x[1] - temp_K)
     )
     ext = ext_array[idx]
+    logger.info('WARNING: Moderator extension of %s corresponds to a temperature of %s K. Target moderator temperature is %s K', ext, closest_temp, temp_K)
+    # print('WARNING: Moderator extension of {} corresponds to a temperature of {} K. Target moderator temperature is {} K'.format(
+    #     ext, closest_temp, temp_K))
 
-    if abs(temp_K - closest_temp) > 1:  # If the difference is greater than 1 degree
-        print('WARNING: Moderator extension of {} corresponds to a temperature of {} K. Target moderator temperature is {} K'.format(
-            ext, closest_temp, temp_K))
-
-    return str(ext)
-
-
-
+    return str(ext), closest_temp
