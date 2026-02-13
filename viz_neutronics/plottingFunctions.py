@@ -4,7 +4,7 @@ import matplotlib.pyplot as plot
 from itertools import cycle
 import os
 import logging
-from typing import Literal
+from typing import Literal, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -336,9 +336,12 @@ def plotSpatialTallyMC(
         outputFileMC: str,
         tallyName: str,
         normalise_by_mean: Literal["all", "non-zero", None] = "all",
-        response_index: float = 0, vmax: float | None = None,
-        vmin: float | None = None, vmax_unc: float | None = None,
-        vmin_unc: float | None = None, plotting: bool = True,
+        response_index: float = 0, 
+        vmax: Optional[float] = None,
+        vmin: Optional[float]=None, 
+        vmax_unc: Optional[float] = None,
+        vmin_unc: Optional[float] = None, 
+        plotting: bool = True,
         visualise_quarter: Literal[False, 'top-right', 'bottom-right',
                                    'top-right-only', 'bottom-right-only'] = False,
         aspect_ratio: float = 1,
@@ -353,7 +356,7 @@ def plotSpatialTallyMC(
         colour: str = 'black',
         dp: float = 3,
         tol: float = 1e-16,
-        indices: list | None = None):
+        indices: Optional[list] = None):
     """Plots MC tally in Cartesian space along with the uncertainty.
 
     Parameters
@@ -366,13 +369,13 @@ def plotSpatialTallyMC(
         Normalise the tally value to the mean value., by default "all"
     response_index : float, optional
         If multiple responses have been tallied for this clerk, use this index to specify which one to plot, by default 0
-    vmax : float | None, optional
+    vmax : Optional[float], optional
         Maximum value plotted, by default None
     vmin : float | None, optional
         Minimum value plotted, by default None
-    vmax_unc : float | None, optional
+    vmax_unc : Optional[float], optional
         Maximum standard deviation plotted, by default None
-    vmin_unc : float | None, optional
+    vmin_unc : Optional[float], optional
         Minimum standard deviation plotted, by default None
     plotting : bool, optional
         If True, plots and saves a figure. Otherwise just returns the values, by default True
@@ -409,7 +412,7 @@ def plotSpatialTallyMC(
         Annotation number of decimal points, by default 3
     tol : float, optional
         The cut-off when removing zero-values cells from colourmaps, by default 1e-16
-    indices : list | None, optional
+    indices : Optional[list], optional
         Another way to slice, takes in a list of tuples, by default None
 
     Returns

@@ -159,6 +159,37 @@ def storeAssemblyJSON(assembly, name, outputDir, plotting=True, colour_map='magm
     return data
 
 
+def storeReflectorJSON(refl, newpath='outputs', plotting=True):
+    """
+    Input is a PWRAssembly object that has been solved (using MOC). Extract form factors, keff and max and min pin power.
+    Returns the dictionary containing this information, and also plots the power distribution. Creates a human-readable JSON file.
+    """
+    logger.info('Storing reflector data')
+
+    outputs_filepath = newpath + '/'
+    if not os.path.exists(outputs_filepath):
+        os.makedirs(outputs_filepath)
+
+    data = {
+        'nodal_flux': refl.nodal_flux.tolist(),
+        'few_group_flux': refl.few_group_flux.tolist(),
+        'x': refl.x.tolist(),
+        'x_interface': refl.x_interface,
+        'nem_keff_flux': refl.nem_keff_flux.tolist(),
+        'condensation_scheme': refl.condensation_scheme
+        }
+
+    data.update(readDiffusionData(refl.diffusion_data))
+
+    with open(outputs_filepath + "reflector_data.json", "w") as f:
+        json.dump(data, f, indent=2)
+
+    if plotting:
+        plotReflFlux(outputs_filepath + "reflector_data.json",outputs_filepath)
+
+    return data
+
+
 def readDiffusionData(diff_data: scrb.DiffusionData):
     """Returns a dictionary containing diffusion data"""
     ngroups = diff_data.ngroups
@@ -226,6 +257,37 @@ def plotAssemFormFactors(filepath, outputDir, colour_map='magma', tol=1e-6):
                  + '\nEs {}'.format(Es))
     plot.savefig(outputFilePath + '.svg')
     plot.close()
+
+
+def plotReflFlux(filepath, outputDir):
+    data = readJSON(filepath)
+
+    # Plot flux for each group
+    x = data['x']
+    ngroups = len(data['condensation_scheme'])
+
+    for g in range(ngroups):
+        fig, ax = plot.subplots()
+        ax.plot(x, np.array(data['few_group_flux'])[g, :], label="Sn")
+        ax.plot(x, np.array(data['nodal_flux'])[g, :], label="NEM Fixed-Source")
+        ax.plot(x, np.array(data['nem_keff_flux'])[g, :, 0, 0], label="NEM keff")
+        ax.vlines(data['x_interface'], ymin=np.min(np.array(data['few_group_flux'])[g, :]), ymax=np.max(np.array(data['few_group_flux'])[g, :]), colors='black', linestyles='dashed')
+        ax.set_xlabel("x [cm]")
+        ax.set_ylabel("Flux [Arb. Units]")
+        ax.set_title("Group {:}".format(g))      
+        ax.grid()
+        ax.legend()
+
+        fig.suptitle('Refl ' + 'form factors'
+                    + '\nADF: {}'.format(np.array(data['adf'])[:, 0])
+                    + ', D: {}'.format(np.array(data['D']))
+                    + '\nEs {}'.format(np.array(data['Es'])))
+
+        plot.tight_layout()
+        plot.savefig(outputDir + 'reflector_flux_G{:.0f}.svg'.format(g))
+        plot.close()
+
+    
 
 
 def readJSON(filepath):
@@ -321,7 +383,11 @@ def plotDiffusionData(binFileMOC: str, scarab_text_log: str, param: str, name: s
     return value
 
 
-def storeCoreBuilder(core_builder, z_pin: np.ndarray, x_assem, y_assem, z_assem, outputs_filepath):
+def storeCoreBuilder(core_builder, z_pin: np.ndarray, x_assem, y_assem, z_assem, newpath):
+
+    # make an output folder to store outputs
+    if not os.path.exists(newpath):
+        os.makedirs(newpath)
 
     assembly_powers = core_builder.compute_assembly_powers()
     pin_power = core_builder.compute_pin_powers(z_pin)
@@ -346,10 +412,10 @@ def storeCoreBuilder(core_builder, z_pin: np.ndarray, x_assem, y_assem, z_assem,
         'power_assembly_wise': assembly_powers.tolist(),
         'ngroups': solver.ngroups
     }
-    logger.info('dumping to json %s', outputs_filepath +
+    logger.info('dumping to json %s', newpath +
                 'coreBuilder_output.json')
 
-    with open(outputs_filepath + 'coreBuilder_output.json', 'w') as f:
+    with open(newpath + 'coreBuilder_output.json', 'w') as f:
         json.dump(dictionary, f, indent=2)
 
 
