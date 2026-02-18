@@ -230,7 +230,9 @@ def readDiffusionData(diff_data: scrb.DiffusionData):
     return data
 
 
-def plotAssemFormFactors(filepath, outputDir, colour_map='magma', tol=1e-6):
+def plotAssemFormFactors(filepath, outputDir, colour_map='magma', tol=1e-6, normalise_by_mean='all', annotate=False, fontsize: float = 2,
+        colour: str = 'black',
+        dp: float = 3,):
     data = readJSON(filepath)
 
     name = data['name']
@@ -238,16 +240,22 @@ def plotAssemFormFactors(filepath, outputDir, colour_map='magma', tol=1e-6):
     adf = np.array(data['adf'])[:, 0]
     D = np.array(data['D'])
     Es = np.array(data['Es'])
-    max_pin_power = data['max_pin_power']
-    min_pin_power = data['min_pin_power']
+
     form_factors = np.array(data['form_factors'])
+    form_factors = normalise_plots(form_factors, normalise_by_mean)
+    
     outputFilePath = outputDir + '/' + name
 
     print('Plotting {} form factors'.format(data['name']))
 
     fig, ax = plot.subplots()
     masked = np.ma.masked_where(form_factors < tol, form_factors)
+    max_pin_power = np.max(masked) # Must calculate this AFTER normalisation
+    min_pin_power = np.min(masked)
     val = ax.imshow(masked, cmap=colour_map)
+
+    ax = label_plot(annotate, masked, ax, fontsize=fontsize, color=colour, dp=dp)
+
     fig.colorbar(val, ax=ax).minorticks_on()
     fig.suptitle(name + ': Scarabee MOC ' + 'form factors' +
                  '\n$k_{{MOC}}={:.7f}$, pin powers max: {:.2f}, min: {:.2f}'.format(
@@ -260,6 +268,9 @@ def plotAssemFormFactors(filepath, outputDir, colour_map='magma', tol=1e-6):
 
 
 def plotReflFlux(filepath, outputDir):
+    outputs_filepath = outputDir + '/'
+    if not os.path.exists(outputs_filepath):
+        os.makedirs(outputs_filepath)
     data = readJSON(filepath)
 
     # Plot flux for each group
@@ -284,7 +295,7 @@ def plotReflFlux(filepath, outputDir):
                     + '\nEs {}'.format(np.array(data['Es'])))
 
         plot.tight_layout()
-        plot.savefig(outputDir + 'reflector_flux_G{:.0f}.svg'.format(g))
+        plot.savefig(outputs_filepath + 'reflector_flux_G{:.0f}.svg'.format(g))
         plot.close()
 
     
@@ -298,7 +309,9 @@ def readJSON(filepath):
     return data
 
 
-def plotFissRateCompareAssem_MOCMC(outputFileMC: str, outputFileMOC: str, name='assembly', newpath='outputs', rmse_relative_to=None, cmap_colour='Reds'):
+def plotFissRateCompareAssem_MOCMC(outputFileMC: str, outputFileMOC: str, name='assembly', newpath='outputs', rmse_relative_to=None, cmap_colour='Reds', normalise_by_mean='all', annotate=False, fontsize: float = 2,
+        colour: str = 'black',
+        dp: float = 3,):
     """_summary_
 
     Args:
@@ -321,8 +334,9 @@ def plotFissRateCompareAssem_MOCMC(outputFileMC: str, outputFileMOC: str, name='
     # Fission rate comparison
     tallyname = 'pinFiss'
     fissrateMC, fissrateMC_std = plotSpatialTallyMC(
-        outputFileMC, tallyname, plotting=False)
+        outputFileMC, tallyname, plotting=False, normalise_by_mean=normalise_by_mean)
     fissrateScarab = np.array(resScarab['form_factors'], dtype=float)
+    fissrateScarab = normalise_plots(fissrateScarab, normalise_by_mean=normalise_by_mean)
     diff = (fissrateScarab - fissrateMC) / fissrateMC
 
     # Extract Metadata
@@ -335,6 +349,7 @@ def plotFissRateCompareAssem_MOCMC(outputFileMC: str, outputFileMOC: str, name='
     # plotting
     fig, ax = plot.subplots()
     val = ax.imshow(abs(diff), cmap=cmap_colour, origin='lower')
+    ax = label_plot(annotate, abs(diff), ax, fontsize=fontsize, color=colour, dp=dp)
     fig.colorbar(val, ax=ax).minorticks_on()
 
     fig.suptitle(name + ': Scarabee MOC vs SCONE MC, '
@@ -491,9 +506,7 @@ def plotFromNodalResObject(resScarab, paramName, normalise_by_mean='all', vmax=N
     keff = resScarab.keff
 
     value = apply_indices(indices, value)
-
-    value = normalise_plots(
-        value, normalise_by_mean=normalise_by_mean, tol=tol)
+    
 
     if len(value) == 0:
         raise ValueError('Length of values array is 0!')
@@ -511,6 +524,10 @@ def plotFromNodalResObject(resScarab, paramName, normalise_by_mean='all', vmax=N
             octant_mask = np.fromfunction(      # then to octant
                 lambda i, j: i + j > nx - 1, (ny, nx))
             value = np.ma.masked_where(octant_mask, value)
+    
+    print('Nodal plot normalise')
+    value = normalise_plots(
+        value, normalise_by_mean=normalise_by_mean, tol=tol)
 
     if plotting:
 
@@ -579,7 +596,6 @@ def plot_nodal_results(outputFileScarab, normalise_by_mean='all', vmax=None, vmi
     # Flux
     for g in range(ngroups):
         mgID = g
-        print('mgID', mgID)
         # assemblies
         plotFromNodalResObject(resScarab, paramName='flux_assembly_wise', normalise_by_mean=normalise_by_mean, vmax=vmax, vmin=vmin, plotting=True, aspect_ratio=aspect_ratio, indices=indices_assem,
                                mgID=mgID, tol=tol, newpath=newpath, annotate=annotate, cmap_colour=cmap_colour, fontsize=fontsize, colour=colour, dp=dp, view_geometry=view_geometry)
@@ -605,19 +621,21 @@ def plot_nodal_results(outputFileScarab, normalise_by_mean='all', vmax=None, vmi
                            mgID=None, tol=tol, newpath=newpath, annotate=False, cmap_colour=cmap_colour, fontsize=fontsize, colour=colour, dp=dp, view_geometry=view_geometry)
 
 
-def plotSpatialParam_CompareNodalMC(outputFileMC, outputFileNodal, tallyName_MC, paramNameNodal, normalise_by_mean='all',  response_index_MC=0, plotting=True, visualise_quarter_MC=False, aspect_ratio=1, indicesNodal=None, indicesMC=None, mgID_nodal=None, annotate=False, newpath='outputs', cmap_colour='jet', tol=1e-16, vmax=None, vmin=None, fontsize=5, colour='white', dp=3, view_geometry=None, average_along_diag=False, rmse_relative_to=None):
+def plotSpatialParam_CompareNodalMC(outputFileMC, outputFileNodal, tallyName_MC, paramNameNodal, normalise_by_mean='all',  response_index_MC=0, plotting=True, visualise_quarter_MC=False, aspect_ratio=1, indicesNodal=None, indicesMC=None, mgID=None, annotate=False, newpath='outputs', cmap_colour='jet', tol=1e-16, vmax=None, vmin=None, fontsize=5, colour='white', dp=3, view_geometry=None, average_along_diag=False, rmse_relative_to=None):
     # make an output folder to store outputs
     if not os.path.exists(newpath):
         os.makedirs(newpath)
 
-    value_MC, std_MC = plotSpatialTallyMC(outputFileMC, tallyName=tallyName_MC, normalise_by_mean=normalise_by_mean, response_index=response_index_MC,
+    value_MC, std_MC = plotSpatialTallyMC(outputFileMC, tallyName=tallyName_MC, normalise_by_mean=normalise_by_mean, response_index=response_index_MC, group_index=mgID,
                                           visualise_quarter=visualise_quarter_MC, average_along_diag=average_along_diag, newpath=newpath, annotate=annotate, cmap_colour=cmap_colour, plotting=False, tol=tol, indices=indicesMC)
 
     value_nodal = plotSpatialParamNodal(outputFileNodal, paramNameNodal, normalise_by_mean=normalise_by_mean, vmax=vmax, vmin=vmin, plotting=False, aspect_ratio=aspect_ratio,
-                                        indices=indicesNodal, mgID=mgID_nodal, tol=tol, newpath=newpath, annotate=annotate, cmap_colour=cmap_colour, fontsize=fontsize, colour=colour, dp=dp, view_geometry=view_geometry)
+                                        indices=indicesNodal, mgID=mgID, tol=tol, newpath=newpath, annotate=annotate, cmap_colour=cmap_colour, fontsize=fontsize, colour=colour, dp=dp, view_geometry=view_geometry)
 
-    if mgID_nodal == None:
-        mgID_nodal = ''  # set for plotting label
+    if mgID == None:
+        mgID_label = ''  # set for plotting label
+    else:
+        mgID_label = '_g' + str(mgID)
 
     # extract labels:
     dummy_value = np.ones((2, 2))
@@ -647,8 +665,8 @@ def plotSpatialParam_CompareNodalMC(outputFileMC, outputFileNodal, tallyName_MC,
         ax1.set_title(
             'Value \nNormalised by the mean\n of {} values'.format(normalise_by_mean))
 
-        fig.suptitle('(Nodal -MC) / MC: relative difference in {}. \nMax error={:.3%}, min error={:.3%}, \nRMSE={:.3%} relative to {}.\n$k_{{MC}}={:.5f}$, $k_{{nodal}}={:.5f}$, diff={:.0f} pcm'.format(
-            paramNameNodal, np.max(masked), np.min(masked), rmse, rmse_relative_to, keff_MC, keff_nodal, keff_diff) + '\n' + quarter_label)
+        fig.suptitle('(Nodal -MC) / MC: relative difference in {} {}. \nMax error={:.3%}, min error={:.3%}, \nRMSE={:.3%} relative to {}.\n$k_{{MC}}={:.5f}$, $k_{{nodal}}={:.5f}$, diff={:.0f} pcm'.format(
+            mgID_label[1:],paramNameNodal, np.max(masked), np.min(masked), rmse, rmse_relative_to, keff_MC, keff_nodal, keff_diff) + '\n' + quarter_label)
 
         plot.savefig(newpath + '/compare_MCNodal' +
-                     paramNameNodal + str(mgID_nodal) + '.svg')
+                     paramNameNodal + str(mgID_label) + '.svg')

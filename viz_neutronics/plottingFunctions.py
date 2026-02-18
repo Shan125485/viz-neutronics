@@ -6,6 +6,8 @@ import os
 import logging
 from typing import Literal, Optional
 
+from viz_neutronics.nuclearDensityCalculator import results
+
 logger = logging.getLogger(__name__)
 
 # run from outside module
@@ -336,7 +338,8 @@ def plotSpatialTallyMC(
         outputFileMC: str,
         tallyName: str,
         normalise_by_mean: Literal["all", "non-zero", None] = "all",
-        response_index: float = 0, 
+        response_index: int = 0, 
+        group_index: int = 0,
         vmax: Optional[float] = None,
         vmin: Optional[float]=None, 
         vmax_unc: Optional[float] = None,
@@ -367,8 +370,10 @@ def plotSpatialTallyMC(
         Name of tally to be plotted, set by user in the MC input file.
     normalise_by_mean : Literal["all", "non-zero"], optional
         Normalise the tally value to the mean value., by default "all"
-    response_index : float, optional
+    response_index : int, optional
         If multiple responses have been tallied for this clerk, use this index to specify which one to plot, by default 0
+    group_index : int, optional
+        Select the energy group to be plotted, o-indexed, where lower number corresponds to higher energy
     vmax : Optional[float], optional
         Maximum value plotted, by default None
     vmin : float | None, optional
@@ -427,11 +432,38 @@ def plotSpatialTallyMC(
     if not os.path.exists(newpath):
         os.makedirs(newpath)
 
-    outputs = readOutputs(outputFileMC, print_output=False)
+    outputs = readOutputs(outputFileMC, print_output=True)
 
-    result = np.array(getattr(outputs.active, tallyName).Res)
-    value = result[..., response_index, 0]
-    std = result[..., response_index, 1] / value
+    if hasattr(outputs.active, tallyName):
+        pass
+    else:
+        logging.warning('!!! %s tally was not found, end of plotting !!!', tallyName)
+        exit()
+
+    activeTallyResults = getattr(outputs.active, tallyName)
+
+    result = np.array(activeTallyResults.Res)
+
+    if hasattr(activeTallyResults, 'EnergyBounds'):
+        
+        energyBounds = activeTallyResults.EnergyBounds
+        logging.info('Energy bounds %s detected for %s', energyBounds, tallyName)
+        ngroups = len(list(energyBounds)) - 1
+
+        SCONE_group_index = ngroups - group_index
+        logging.info('Group index number is %s', group_index)
+        logging.info('SCONE tally group index is therefore %s', SCONE_group_index)
+        # SCONE MC energyMap tallies are listed from thermal to fast groups
+        # But I want to use fast to thermal indexing  
+        
+        value = result[SCONE_group_index, ..., response_index, 0]
+        std = result[SCONE_group_index, ..., response_index, 1] / value
+
+        label_energy_group = '_g'+str(group_index)
+    else:
+        value = result[..., response_index, 0]
+        std = result[..., response_index, 1] / value
+        label_energy_group = ''
 
     keff, stdKeff = findKeffMC(outputFileMC)  # extract keff
     
@@ -458,6 +490,7 @@ def plotSpatialTallyMC(
         value, std, visualise_quarter=visualise_quarter)
 
     # normalise values
+    print('MC plot normalise')
     value = normalise_plots(value, normalise_by_mean, tol=tol)
 
     if plotting:
@@ -497,7 +530,7 @@ def plotSpatialTallyMC(
             keff, 1e5 * stdKeff) + '\n' + quarter_label + '\n' + removed_edges_label + '\n' + average_along_diag_label)
 
         plot.savefig(newpath + '/' + modelName + tallyName +
-                     str(int(response_index)) + '_MC.svg')
+                     str(int(response_index)) + label_energy_group + '_MC.svg')
         plot.close()
 
     return value, std
@@ -1271,16 +1304,22 @@ def normalise_plots(value, normalise_by_mean, tol=1e-16):
     if normalise_by_mean == 'non-zero':
         value = np.where(np.isnan(value), 0, value) # First turn NaNs into 0s
         masked_non_zero = np.ma.masked_where(value < tol, value) # Then exclude 0s from the calculation
-        logger.debug('Number of non-zero values: %s', masked_non_zero.count())
+        logger.info('Number of non-zero values: %s', masked_non_zero.count())
+        print('Number of non-zero values: %s', masked_non_zero.count())
         mean_non_zero = np.mean(masked_non_zero)
-        logger.debug('Normalising by the mean of non-zero values, %s', mean_non_zero)
+        logger.info('Normalising by the mean of non-zero values, %s', mean_non_zero)
         value = value / mean_non_zero
     elif normalise_by_mean == 'all':
         value = np.where(np.isnan(value), 0, value) # Give all cells a value, even NaNs
-        logger.debug('Number of values used to calculate mean: %s', value.shape)
+        logger.info('Number of values used to calculate mean: %s', value.size)
         mean = np.mean(value)
-        logger.debug('Normalising by the mean of all values, %s', mean)
+        logger.info('Normalising by the mean of all values, %s', mean)
         value = value / mean
+    elif normalise_by_mean == 'max':
+        value = np.where(np.isnan(value), 0, value) # Give all cells a value, even NaNs
+        max = np.max(value)
+        logger.info('Normalising by the max of all values, %s', max)
+        value = value / max
     elif normalise_by_mean == None:
         'No normalisation applied'
         value = value
@@ -1486,7 +1525,7 @@ def plot_MC_results(
 
 
     fissTally_MC_pin = 'pinFiss'
-    fissTally_MC_assem = 'assemblyFissRadial'
+    fissTally_MC_assem = 'assemblyFiss'
     fluxIndex = 0
     fissIndex = 1
 
@@ -1507,6 +1546,43 @@ def plot_MC_results(
     # (assemblies)
     plotSpatialTallyMC(outputFileMC, fissTally_MC_assem, normalise_by_mean=normalise_by_mean, response_index=fissIndex,
                        visualise_quarter=visualise_quarter, average_along_diag=average_along_diag, newpath=newpath, annotate=annotate, cmap_colour=cmap_colour, fontsize=fontsize, colour=colour, dp=dp, tol=tol)
+
+    # Group-wise flux plots
+    # (pins)
+    fluxTally_MC_pin = 'pinFlux'
+    fluxTally_MC_assembly = 'assemblyFlux'
+    outputs = readOutputs(outputFileMC, print_output=False)
+    outputs_active = outputs.active
+
+    if hasattr(outputs_active, fluxTally_MC_pin):
+        activeTallyResults = getattr(outputs_active, fluxTally_MC_pin)
+        logging.info('Flux tallies detected')
+ 
+        if hasattr(activeTallyResults, 'EnergyBounds'):
+            energyBounds = activeTallyResults.EnergyBounds
+            logging.info('Energy bounds %s detected for %s', energyBounds, fluxTally_MC_pin)
+            ngroups = len(list(energyBounds))
+            logging.info('Finding the number of energy groups, %s', ngroups)
+
+            for g in range(ngroups):
+                plotSpatialTallyMC(outputFileMC, fluxTally_MC_pin, normalise_by_mean=normalise_by_mean, response_index=0, group_index=g,
+                                visualise_quarter=visualise_quarter, average_along_diag=average_along_diag, newpath=newpath, annotate=False, cmap_colour=cmap_colour, tol=tol)
+                plotSpatialTallyMC(outputFileMC, fluxTally_MC_assembly, normalise_by_mean=normalise_by_mean, response_index=0, group_index=g,
+                                visualise_quarter=visualise_quarter, average_along_diag=average_along_diag, newpath=newpath, annotate=annotate, cmap_colour=cmap_colour, colour=colour, fontsize=fontsize)
+        else:
+            logging.info('No energy bounds detected')
+    else:
+        logging.info('No flux tallies detcted, end plotting')
+        return
+    
+
+    
+
+    # result = np.array(activeTallyResults.Res)
+
+    
+
+
 
 
 
