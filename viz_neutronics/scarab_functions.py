@@ -4,7 +4,7 @@ import os
 import matplotlib.pyplot as plot
 import re
 import scarabee as scrb
-from viz_neutronics.plottingFunctions import readOutputs, findKeffMC, plotSpatialTallyMC, rmsError, visualiseQuarter, normalise_plots, label_plot, apply_indices
+from viz_neutronics.plottingFunctions import readOutputs, findKeffMC, plotSpatialTallyMC, rmsError, visualiseQuarter, normalise_plots, label_plot, apply_indices, octantFromQuart
 import logging
 
 logger = logging.getLogger(__name__)
@@ -519,13 +519,8 @@ def plotFromNodalResObject(resScarab, paramName, normalise_by_mean='all', vmax=N
         if view_geometry == 'octant':
             value = value[: (ny+1) // 2, nx // 2:]  # first reduce to quarter
 
-            ny, nx = value.shape
+            value = octantFromQuart(value)
 
-            octant_mask = np.fromfunction(      # then to octant
-                lambda i, j: i + j > nx - 1, (ny, nx))
-            value = np.ma.masked_where(octant_mask, value)
-    
-    print('Nodal plot normalise')
     value = normalise_plots(
         value, normalise_by_mean=normalise_by_mean, tol=tol)
 
@@ -553,6 +548,9 @@ def plotFromNodalResObject(resScarab, paramName, normalise_by_mean='all', vmax=N
 
     return value
 
+
+
+    
 
 def plotSpatialParamNodal(outputJSONScarab, paramName, normalise_by_mean='all', vmax=None, vmin=None, plotting=True, aspect_ratio=1, indices=None, mgID=None, tol=1e-16, newpath='outputs', annotate=False, cmap_colour='magma', fontsize=2, colour='white', dp=3, view_geometry=True):
     """Plots quantity in Cartesian space along with the uncertainty
@@ -582,6 +580,7 @@ def plotSpatialParamNodal(outputJSONScarab, paramName, normalise_by_mean='all', 
 
 
 def plot_nodal_results(outputFileScarab, normalise_by_mean='all', vmax=None, vmin=None, aspect_ratio=1, tol=1e-16, newpath='outputs', annotate=False, cmap_colour='magma', fontsize=2, colour='white', dp=3, view_geometry=True):
+
 
     resScarab = readCoreBuilder(outputFileScarab)
     indices_pins = [(17, -17), (17, -17)]

@@ -488,6 +488,8 @@ def plotSpatialTallyMC(
 
     value, std, quarter_label = visualiseQuarter(
         value, std, visualise_quarter=visualise_quarter)
+    
+
 
     # normalise values
     print('MC plot normalise')
@@ -1302,7 +1304,7 @@ def normalise(array, target):
 def normalise_plots(value, normalise_by_mean, tol=1e-16):
 
     if normalise_by_mean == 'non-zero':
-        value = np.where(np.isnan(value), 0, value) # First turn NaNs into 0s
+        value = np.ma.where(np.isnan(value), 0, value) # First turn NaNs into 0s
         masked_non_zero = np.ma.masked_where(value < tol, value) # Then exclude 0s from the calculation
         logger.info('Number of non-zero values: %s', masked_non_zero.count())
         print('Number of non-zero values: %s', masked_non_zero.count())
@@ -1310,14 +1312,14 @@ def normalise_plots(value, normalise_by_mean, tol=1e-16):
         logger.info('Normalising by the mean of non-zero values, %s', mean_non_zero)
         value = value / mean_non_zero
     elif normalise_by_mean == 'all':
-        value = np.where(np.isnan(value), 0, value) # Give all cells a value, even NaNs
+        value = np.ma.where(np.isnan(value), 0, value) # Give all cells a value, even NaNs
         logger.info('Number of values used to calculate mean: %s', value.size)
         mean = np.mean(value)
         logger.info('Normalising by the mean of all values, %s', mean)
         value = value / mean
     elif normalise_by_mean == 'max':
-        value = np.where(np.isnan(value), 0, value) # Give all cells a value, even NaNs
-        max = np.max(value)
+        value = np.ma.where(np.isnan(value), 0, value) # Give all cells a value, even NaNs
+        max = np.ma.max(value)
         logger.info('Normalising by the max of all values, %s', max)
         value = value / max
     elif normalise_by_mean == None:
@@ -1457,6 +1459,23 @@ def visualiseQuarter(value, std, visualise_quarter=False):
 
         # step 3 write a label
         quarter_label = '(visual adjusted for quarter geometry)'
+    
+    elif visualise_quarter == 'bottom-right-octant':
+        # Only adjust the values along the centreline.
+
+
+        value[-1, :] = 2 * value[-1, :]
+        value[:, 0] = 2 * value[:, 0]
+
+        std[-1, :] = std[-1, :] / 2
+        std[:, 0] = std[:, 0] / 2
+
+        logger.info('Mask top octant')
+        value = octantFromQuart(value)
+        std = octantFromQuart(std)
+
+        quarter_label='(visual adjusted for octant geometry)'
+    
     elif visualise_quarter == False:
         quarter_label = ""
     else:
@@ -1612,9 +1631,16 @@ def octantSymmetry(value, std, average_along_diag=False):
 
     elif average_along_diag == False:
         average_along_diag_label = ''
+    
 
     return value, std, average_along_diag_label
 
+def octantFromQuart(value):
+    ny, nx = value.shape
+    octant_mask = np.fromfunction(      # then to octant
+                lambda i, j: i + j > nx - 1, (ny, nx))
+    value = np.ma.masked_where(octant_mask, value)
+    return value
 
 def label_plot(annotate, value, ax, fontsize=2, color='black', dp=3):
     if annotate == True:
