@@ -5,6 +5,7 @@ import matplotlib.pyplot as plot
 import re
 import scarabee as scrb
 from viz_neutronics.plottingFunctions import readOutputs, findKeffMC, plotSpatialTallyMC, rmsError, visualiseQuarter, normalise_plots, label_plot, apply_indices, octantFromQuart
+from viz_neutronics.transport_correction import write_mgXS_file
 import logging
 
 logger = logging.getLogger(__name__)
@@ -655,7 +656,7 @@ def plotSpatialParam_CompareNodalMC(outputFileMC, outputFileNodal, tallyName_MC,
         fig, ax1 = plot.subplots()
         masked = np.ma.masked_where(value_nodal < tol, rel_diff)
         val_plot = ax1.imshow(masked * 100, cmap=cmap_colour,
-                              origin='lower', aspect=aspect_ratio, vmax=None)
+                              origin='lower', aspect=aspect_ratio, vmax=None, vmin=None)
 
         fig.colorbar(val_plot, ax=ax1, label='%').minorticks_on()
 
@@ -669,3 +670,107 @@ def plotSpatialParam_CompareNodalMC(outputFileMC, outputFileNodal, tallyName_MC,
 
         plot.savefig(newpath + '/compare_MCNodal' +
                      paramNameNodal + str(mgID_label) + '.svg')
+
+
+
+
+def read_scarab_XS(xs, max_legendre=1):
+
+    ngroups = xs.ngroups
+    max_legendre = xs.max_legendre_order
+
+    # Initialise arrays
+    Etr_array = np.zeros((ngroups))
+    Dtr_array = np.zeros((ngroups))
+    Et_array = np.zeros((ngroups))
+    Ea_array = np.zeros((ngroups))
+    Ef_array = np.zeros((ngroups))
+    vEf_array = np.zeros((ngroups))
+    nu_array = np.zeros((ngroups))
+    Er_array = np.zeros((ngroups))
+    chi_array = np.zeros((ngroups))
+    Es_tr_array = np.zeros((ngroups, ngroups))
+    Es_array = np.zeros((ngroups, ngroups))
+
+    if max_legendre >= 1:
+        Es1_array = np.zeros((ngroups, ngroups))
+    elif max_legendre >= 2:
+        Es2_array = np.zeros((ngroups, ngroups))
+    elif max_legendre >= 3:
+        Es3_array = np.zeros((ngroups, ngroups))
+
+    # assign values
+
+    for g in range(ngroups):
+        Etr_array[g] = xs.Etr(g)
+        Dtr_array[g] = xs.Dtr(g)
+        Et_array[g] = xs.Et(g)
+        Ea_array[g] = xs.Ea(g)
+        Ef_array[g] = xs.Ef(g)
+        vEf_array[g] = xs.vEf(g)
+        nu_array[g] = xs.nu(g)
+        Er_array[g] = xs.Er(g)
+        chi_array[g] = xs.chi(g)
+
+        for g_out in range(ngroups):
+            Es_tr_array[g, g_out] = xs.Es_tr(g, g_out)
+            Es_array[g, g_out] = xs.Es(g, g_out)
+            if max_legendre >= 1:
+                Es1_array[g, g_out] = xs.Es(1, g, g_out)
+            if max_legendre >= 2:
+                Es2_array[g, g_out] = xs.Es(2, g, g_out)
+            if max_legendre >= 3:
+                Es3_array[g, g_out] = xs.Es(3, g, g_out)
+
+    dict_XS = {'ngroups': ngroups,
+               'Etr': Etr_array,
+               'Dtr': Dtr_array,
+               'Et': Et_array,
+               'Ea': Ea_array,
+               'Ef': Ef_array,
+               'vEf': vEf_array,
+               'nu': nu_array,
+               'Er': Er_array,
+               'chi': chi_array,
+               'Es_tr': Es_tr_array,
+               'Es': Es_array,
+               'max_legendre_order': max_legendre
+               }
+    if max_legendre >= 1:
+        dict_XS['Es1'] = Es1_array
+    if max_legendre >= 2:
+        dict_XS['Es2'] = Es2_array
+    if max_legendre >= 3:
+        dict_XS['Es3'] = Es3_array
+    
+    return dict_XS
+
+
+def scarab_to_SCONE_moderator_XS(asmbly, material_name, newpath):
+    moderator_XS = asmbly._moderator_xs
+
+    scarab_XS = read_scarab_XS(moderator_XS)
+    capture_XS = scarab_XS['Ef'] + scarab_XS['Ea']
+
+    # transfer to MC SCONE input format
+
+    SCONE_dict = {
+        'numberOfGroups': scarab_XS['ngroups'],
+        'capture': capture_XS,
+        'scatteringMultiplicity': np.ones((scarab_XS['ngroups'], scarab_XS['ngroups'])), # standard PWR libraries count scattering production with fission
+        'P0': scarab_XS['Es_tr']
+    }
+
+    # if fissile:
+    if np.all(scarab_XS['chi']!=0): 
+        SCONE_dict['fission'] = scarab_XS['Ef']
+        SCONE_dict['nu'] = scarab_XS['nu']
+        SCONE_dict['chi'] = scarab_XS['chi']
+
+
+    print('\nWriting cross sections for', material_name, 'to file.')
+    write_mgXS_file(SCONE_dict, material_name, newpath)
+    
+    return SCONE_dict
+
+
