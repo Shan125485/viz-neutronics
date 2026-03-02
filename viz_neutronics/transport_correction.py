@@ -224,24 +224,21 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
         # uncertainty
         P0_corrected_unc_res = np.copy(P0_corrected_unc[matIndex])
 
+        XS_dict = {
+            'numberOfGroups': numGroups,
+            'capture': capture_res,
+            'fission': fission_res,
+            'nu': nu_res,
+            'chi': chi_res,
+            'scatteringMultiplicity': prod_corrected_res,
+            'P0': P0_corrected_res
+
+        }
+
         print('\nWriting cross sections for', mat, 'to file.')
 
-        f = open(newpath + '/' + mat, "w")
+        write_mgXS_file(XS_dict, mat, newpath)
         
-        f.write('\nnumberOfGroups '+ str(numGroups) + ';')
-        f.write('\ncapture    (' + np.array2string(capture_res, threshold=np.inf).replace('[','').replace(']','') + ');')
-        if np.any(fission_res) == False:
-            print('\nNo fission cross section written for {}'.format(mat))
-            
-        else:
-            f.write('\nfission   (' + np.array2string(fission_res, threshold=np.inf).replace('[','').replace(']','') + ');')
-            f.write('\nnu ('+ np.array2string(nu_res, threshold=np.inf).replace('[','').replace(']','') + ');')
-            f.write('\nchi ('+ np.array2string(chi_res, threshold=np.inf).replace('[','').replace(']','') + ');')
-  
-        f.write('\nscatteringMultiplicity ('+ np.array2string(prod_corrected_res.flatten(), threshold=np.inf).replace('[','').replace(']','') + ');')
-        f.write('\nP0 ('+ np.array2string(P0_corrected_res.flatten(), threshold=np.inf ).replace('[','').replace(']','') + ');')
-        f.write('\n' +r'//') # for some reason the file won't run unless these comment signs are at the bottom
-    
         if plotting:
             # ENERGY BOUNDS ORDER CORRECTION
             print('\nPlotting cross sections for', mat)
@@ -361,7 +358,30 @@ def generate_mg_XS(filepath_MC_output : np.array2string, tcType : np.array2strin
 
             plot.savefig(newpath + '/' + 'scattering_colourmap_'  + mat+'.svg')
             plot.close()
-            
+
+
+def write_mgXS_file(mgXSdict, material_name, newpath='materialsInputs'):
+    """Converts a dictionary containing np arrays with the right names into a mgXS input file for SCONE multigroup analysis"""
+    if not os.path.exists(newpath):
+        os.makedirs(newpath)
+    
+    f = open(newpath + '/' + material_name, "w")
+    
+    f.write('\nnumberOfGroups '+ str(mgXSdict['numberOfGroups']) + ';')
+    f.write('\ncapture    (' + np.array2string(mgXSdict['capture'], threshold=np.inf).replace('[','').replace(']','') + ');')
+    if np.any(mgXSdict['fission']) == False:
+        print('\nNo fission cross section written for {}'.format(material_name))
+        
+    else:
+        f.write('\nfission   (' + np.array2string(mgXSdict['fission'], threshold=np.inf).replace('[','').replace(']','') + ');')
+        f.write('\nnu ('+ np.array2string(mgXSdict['nu'], threshold=np.inf).replace('[','').replace(']','') + ');')
+        f.write('\nchi ('+ np.array2string(mgXSdict['chi'], threshold=np.inf).replace('[','').replace(']','') + ');')
+
+    f.write('\nscatteringMultiplicity ('+ np.array2string(mgXSdict['scatteringMultiplicity'].flatten(), threshold=np.inf).replace('[','').replace(']','') + ');')
+    f.write('\nP0 ('+ np.array2string(mgXSdict['P0'].flatten(), threshold=np.inf ).replace('[','').replace(']','') + ');')
+    f.write('\n' +r'//') # for some reason the file won't run unless these comment signs are at the bottom
+    
+
 if __name__=="__main__":
     # test
     # generate_mg_XS("SimplePin_MC_material_output.json", tcType = 'flux limited', switch='OFF')
