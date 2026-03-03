@@ -1,4 +1,7 @@
-
+import h5py
+import matplotlib.pyplot as plot
+import xarray as xr
+import numpy as np
 import logging
 logger = logging.getLogger(__name__)
 
@@ -60,3 +63,89 @@ def find_moder_extension(temp_C: float):
     #     ext, closest_temp, temp_K))
 
     return str(ext), closest_temp
+
+
+
+def plot_h5_data(h5_lib_name, isotope, outputFilepath):
+
+    f = h5py.File('/home/st712/MaterialsLibrary/hdf5_files/' + h5_lib_name + '.h5', 'r')
+    isotope = 'H2_D2O'
+        
+    # print(list(f.keys()))
+    dset = f[isotope]
+    print(list(dset.keys()))
+
+
+
+        
+    data_dict = {}
+
+    xr.set_options(display_expand_data = True)
+
+    ds = xr.Dataset()
+    ds_long = xr.Dataset()
+
+    for key in dset.keys():
+        print(key + ': ' + str(dset[key].shape))
+        data_dict[key] = np.array(dset[key])
+
+        if isotope in ['H1_H2O', 'H2_D2O']:
+            if dset[key].shape[1] == 56:
+                da = xr.DataArray(np.array(dset[key]))
+                ds[key] = da
+
+            elif dset[key].shape[1] == 834:
+                da_long = xr.DataArray(np.array(dset[key]))
+                ds_long[key] = da_long
+
+
+    # print(data_dict)
+
+
+    ds = ds.rename_dims(dims_dict={'dim_0':'temperature', 'dim_1': 'energy'})
+    ds_long = ds_long.rename_dims(dims_dict={'dim_0':'temperature', 'dim_1': 'energy'})
+    # print(ds.data_vars)
+
+
+    for var_name in ds.data_vars:
+        print(var_name)
+
+        data = ds[var_name]
+        dim_size = ds.sizes
+
+
+        fig, ax = plot.subplots()
+
+        for temp_pos in range(0,dim_size['temperature']):
+            data.isel(temperature=temp_pos).plot(x='energy', label='temperature '+ str(temp_pos), ax=ax)
+
+        title = '{} for {}'.format(var_name, isotope)
+        ax.set_xlabel('Energy group')
+        ax.invert_xaxis()
+        ax.set_ylabel(var_name) 
+        plot.title(title)
+        # plot.legend()
+        plot.savefig(outputFilepath + '/{}_{}.svg'.format(isotope, var_name))
+        plot.close()
+
+    for var_name in ds_long.data_vars:
+        print(var_name)
+        data = ds_long[var_name]
+        dim_size = ds_long.sizes
+
+
+        fig, ax = plot.subplots()
+
+        for temp_pos in range(0,dim_size['temperature']):
+            data.isel(temperature=temp_pos).plot(x='energy', label='temperature '+ str(temp_pos), ax=ax)
+
+        title = '{} for {}'.format(var_name, isotope)
+        ax.set_xlabel('Energy group')
+        ax.invert_xaxis()
+        ax.set_ylabel(var_name) 
+        plot.title(title)
+        # plot.legend()
+        plot.savefig(outputFilepath + '/{}_{}.svg'.format(isotope, var_name))
+        plot.close()
+
+    return
