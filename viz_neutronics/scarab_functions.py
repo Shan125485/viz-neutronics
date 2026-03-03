@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import json
 import os
 import matplotlib.pyplot as plot
@@ -674,7 +675,7 @@ def plotSpatialParam_CompareNodalMC(outputFileMC, outputFileNodal, tallyName_MC,
 
 
 
-def read_scarab_XS(xs, max_legendre=1):
+def read_scarab_XS(xs, material_name, save_to='outputs/', plotting=True, groupStructureCSV=None, tcType_label=None):
 
     ngroups = xs.ngroups
     max_legendre = xs.max_legendre_order
@@ -734,7 +735,8 @@ def read_scarab_XS(xs, max_legendre=1):
                'chi': chi_array,
                'Es_tr': Es_tr_array,
                'Es': Es_array,
-               'max_legendre_order': max_legendre
+               'max_legendre_order': max_legendre,
+               'material_name': material_name
                }
     if max_legendre >= 1:
         dict_XS['Es1'] = Es1_array
@@ -742,14 +744,31 @@ def read_scarab_XS(xs, max_legendre=1):
         dict_XS['Es2'] = Es2_array
     if max_legendre >= 3:
         dict_XS['Es3'] = Es3_array
+        
+    # save to json
+    filepath_save = save_to + material_name + "_xs_scarab.json"
+    dict_XS_save = {
+        key: value.tolist() if isinstance(value, np.ndarray) else value
+        for key, value in dict_XS.items()
+    }
+    with open(filepath_save, "w") as f:
+        logging.info('Saving XS data to %s', filepath_save )
+        json.dump(dict_XS_save, f, indent=2)
+    
+    if plotting:
+        plot_scarabXS(filepath_save, groupStructureCSV, save_to, tcType_label)
     
     return dict_XS
 
 
-def scarab_to_SCONE_moderator_XS(asmbly, material_name, newpath):
+def scarab_to_SCONE_moderator_XS(asmbly, material_name, newpath, plotting=True, groupStructureCSV=None, tcType_label=None):
+    outputs_filepath = newpath + '/'
+    if not os.path.exists(outputs_filepath):
+        os.makedirs(outputs_filepath)
+
     moderator_XS = asmbly._moderator_xs
 
-    scarab_XS = read_scarab_XS(moderator_XS)
+    scarab_XS = read_scarab_XS(moderator_XS, material_name, save_to=outputs_filepath, plotting=plotting, groupStructureCSV=groupStructureCSV, tcType_label=tcType_label)
     capture_XS = scarab_XS['Ef'] + scarab_XS['Ea']
 
     # transfer to MC SCONE input format
@@ -761,16 +780,116 @@ def scarab_to_SCONE_moderator_XS(asmbly, material_name, newpath):
         'P0': scarab_XS['Es_tr']
     }
 
-    # if fissile:
-    if np.all(scarab_XS['chi']!=0): 
-        SCONE_dict['fission'] = scarab_XS['Ef']
-        SCONE_dict['nu'] = scarab_XS['nu']
-        SCONE_dict['chi'] = scarab_XS['chi']
+    SCONE_dict['fission'] = scarab_XS['Ef']
+    SCONE_dict['nu'] = scarab_XS['nu']
+    SCONE_dict['chi'] = scarab_XS['chi']
 
 
     print('\nWriting cross sections for', material_name, 'to file.')
-    write_mgXS_file(SCONE_dict, material_name, newpath)
+    write_mgXS_file(SCONE_dict, material_name, outputs_filepath)
     
     return SCONE_dict
 
 
+def plot_scarabXS(file2read, groupStructureCSV, save_to, tcType_label):
+
+    data = readJSON(file2read)
+    ngroups = data['ngroups']
+    material_name = data['material_name']
+    Ef_array = np.array(data['Ef'])
+    Ea_array = np.array(data['Ea'])
+    Dtr_array = np.array(data['Dtr'])
+    Etr_array = np.array(data['Etr'])
+    Et_array = np.array(data['Et'])
+    Es_tr_array = np.array(data['Es_tr'])
+
+    groupData = pd.read_csv(groupStructureCSV)
+    x = (groupData['energy (MeV) - upper bound'] + groupData['energy (MeV) - lower bound']) / 2
+    widths = groupData['energy (MeV) - upper bound'] - groupData['energy (MeV) - lower bound']
+
+
+    # ENERGY BOUNDS ORDER CORRECTION
+    print('\nPlotting cross sections for', material_name)
+
+    fig, ax = plot.subplots()
+    capture_array = Ef_array + Ea_array
+    ax.bar(x, Ef_array, width=widths,label='fission',color='green', edgecolor='black',)
+    ax.bar(x, capture_array, width=widths, label='capture',color='red', edgecolor='black', bottom=Ef_array)
+
+
+    if ngroups == 1:
+        print('\nOne energy group only')
+        scatter_res = np.sum(Es_tr_array,1).flatten()
+        ax.bar(x, scatter_res, width=widths, label='scatter', color='blue', edgecolor='black', bottom=Ef_array+capture_array)
+
+
+    else:
+        scatter_res =  np.sum(Es_tr_array,1)
+        ax.bar(x, scatter_res, width=widths, label='scatter', color='blue', edgecolor='black', bottom=Ef_array+capture_array)
+
+    ax.legend()
+    ax.set_xscale('log')
+    ax.set_ylabel('cm^-1')
+    ax.set_xlabel('MeV')
+
+    ax.set_title('{:.0f} macroscopic group cross section(s) for {} (from Scarabee).'.format(ngroups, material_name))
+    plot.grid()
+    plot.savefig(save_to + '/'+'Cross-sections_' + material_name + '_scarab.svg')
+    plot.close()
+
+
+    # plot transport corrections in the same way, sharing some variables.
+    print('\nPlotting transport corrections for', material_name)
+    
+    fig, ax = plot.subplots()
+    ax.bar(x, Dtr_array, width=widths,label='Transport correction',color='orange', edgecolor='black')
+    
+    ax.set_xscale('log')
+    ax.set_ylabel('cm^-1')
+    ax.set_xlabel('MeV')
+    ax.set_title('[From scarabee] {:.0f} {} transport correction(s) for {}.'.format(ngroups, tcType_label, material_name))
+    plot.grid()
+    plot.savefig(save_to + '/'+'Transport_correction_' + material_name + '_scarab.svg')
+    plot.close()
+
+    # plot transport correction ratio in the same way, sharing some variables.
+    print('\nPlotting transport correction ratio for', material_name)
+
+    fig, ax = plot.subplots()
+
+    ratio = Etr_array / Et_array
+    ax.bar(x, ratio, width=widths,label='Transport correction ratio',color='yellow', edgecolor='black')
+
+    ax.set_xscale('log')
+    ax.set_ylabel('transport / total')
+    ax.set_xlabel('MeV')
+    ax.set_title('[From Scarabee] {:.0f} group, {}\n{} transport cross-section: total cross-section ratio'.format(ngroups, material_name, tcType_label))
+    plot.grid()
+    plot.savefig(save_to + '/'+'Transport_correction_ratio_' + material_name + '_scarab.svg')
+    plot.close()
+    # Also plot the scattering matrices:
+    # ideally should plot all XS, P0 and P1.
+    print('\nPlotting scattering matrices for', material_name)
+    fig,axP0 = plot.subplots()
+
+    max_abs_P0 = np.max(np.abs(Es_tr_array))
+
+    Es_tr_array = np.reshape(Es_tr_array, (ngroups, ngroups))
+
+    P0_scale = axP0.imshow(Es_tr_array, cmap='RdBu_r', vmin=-max_abs_P0, vmax=max_abs_P0)
+
+    fig.colorbar(P0_scale, ax=axP0).minorticks_on()
+
+    # sanity check
+    max_P0 = np.max(Es_tr_array)
+    min_P0 = np.min(Es_tr_array)
+
+    axP0.set_title('P0\nMin={:.2f}, max={:.2f}'.format(min_P0, max_P0))
+    
+    axP0.set_aspect('equal')
+    
+    fig.suptitle("Scattering matrices from Scarabee, {} group(s), for {}".format(ngroups, material_name))
+
+    plot.savefig(save_to + '/' + 'scattering_colourmap_'  + material_name+'_scarab.svg')
+    plot.close()
+    
