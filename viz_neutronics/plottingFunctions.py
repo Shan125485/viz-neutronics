@@ -885,7 +885,7 @@ def plotSpatialTallyRR_v0(outputFileRR, tallyName, normalise_by_mean='all', vmax
     return value_plot, std_plot
 
 
-def plotSpatialTallyCompare_MCRR(outputFileMC, outputFileRR, tallyName_MC, tallyName_RR, normalise_by_mean='all', response_index_MC=0, plotting=True, visualise_quarter=False, aspect_ratio=1, orientation='horizontal', sideByside=False, i=0, j=None, remove_edges_2D=False, newpath='outputs'):
+def plotSpatialTallyCompare_MCRR(outputFileMC, outputFileRR, tallyName_MC, tallyName_RR, normalise_by_mean='all', mgID=None, response_index_MC=0, response_index_RR=0, plotting=True, visualise_quarter=False, aspect_ratio=1, indices=None, orientation='horizontal', sideByside=False, remove_edges_2D=False, newpath='outputs', annotate=False, cmap_colour='jet', tol=1e-16, vmax=None, vmin=None, fontsize=5, colour='white', dp=3, average_along_diag=False, rmse_relative_to=None):
     """Plot which compares a Monte Carlo and random ray output.
 
     Args:
@@ -912,95 +912,49 @@ def plotSpatialTallyCompare_MCRR(outputFileMC, outputFileRR, tallyName_MC, tally
     if not os.path.exists(newpath):
         os.makedirs(newpath)
 
-    value_MC, std_MC = plotSpatialTallyMC(outputFileMC, tallyName=tallyName_MC, normalise_by_mean=normalise_by_mean,
-                                          response_index=response_index_MC, visualise_quarter=visualise_quarter, plotting=False, remove_edges_2D=remove_edges_2D)
-    value_RR, std_RR = plotSpatialTallyRR(outputFileRR, tallyName=tallyName_RR, normalise_by_mean=normalise_by_mean,
-                                          visualise_quarter=visualise_quarter, plotting=False, remove_edges_2D=remove_edges_2D)
+    value_MC, std_MC = plotSpatialTallyMC(outputFileMC, tallyName=tallyName_MC, normalise_by_mean=normalise_by_mean, group_index=mgID,
+                                          response_index=response_index_MC, visualise_quarter=visualise_quarter, average_along_diag=average_along_diag, plotting=False, remove_edges_2D=remove_edges_2D, indices=indices)
+    value_RR, std_RR = plotSpatialTallyRR(outputFileRR, tallyName=tallyName_RR, normalise_by_mean=normalise_by_mean,group_index=mgID,
+                                          response_index=response_index_RR, visualise_quarter=visualise_quarter, average_along_diag=average_along_diag, plotting=False, remove_edges_2D=remove_edges_2D, indices=indices)
 
+    
+    if mgID == None:
+        mgID_label = ''  # set for plotting label
+    else:
+        mgID_label = '_g' + str(mgID)
+    
     # extract labels:
     dummy_value = np.ones((2, 2))
     dummy_std = np.ones((2, 2))
     dummy_value, dummy_std, removed_edges_label = removeEdges2D(
         dummy_value, dummy_std, remove_edges_2D=remove_edges_2D)
+    
     dummy_value, dummy_std, quarter_label = visualiseQuarter(
         dummy_value, dummy_std, visualise_quarter=visualise_quarter)
-    print('Removed edges label:', removed_edges_label)
-    print('Quarter label:', quarter_label)
 
-    # check symmetry
-    print('MC value symmetry check:')
-    value_MC_flip = np.flip(value_MC, 0)
-    value_RR_flip = np.flip(value_RR, 0)
-    print(100*(value_MC_flip - value_MC_flip.T)/value_MC_flip)
 
-    print('RR value symmetry check:')
-    print(100*(value_RR_flip - value_RR_flip.T)/value_RR_flip)
-
-    print('MC symmetry check:')
-    print(np.allclose(value_MC_flip, value_MC_flip.T, rtol=5e-3, atol=0))
-    print('RR symmetry check:')
-    print(np.allclose(value_RR_flip, value_RR_flip.T, rtol=5e-3, atol=0))
+    # checkSymmetry(value_MC, value_RR)
 
     # extract keff values from the outputs
 
-    keff_MC, stdKeffMC = findKeffMC(outputFileMC)
-    keff_RR, stdKeffRR = findKeffRR(outputFileRR)
+    keff_MC, keff_RR, keff_diff, keff_diff_unc = compareKeff_RRMC(outputFileRR, outputFileMC)
 
-    # If slicing in 1D:
-    value_MC = np.copy(value_MC)[i:j]
-    value_RR = np.copy(value_RR)[i:j]
-    std_MC = np.copy(std_MC)[i:j]
-    std_RR = np.copy(std_RR)[i:j]
-
-    # TEMP TODO turn slicing option 2D
-
-    # k = 8
-    # l = -8
-    # value_MC = np.copy(value_MC)[:l, k:]
-    # value_RR = np.copy(value_RR)[:l, k:]
-    # std_MC = np.copy(std_MC)[:l,k:]
-    # std_RR = np.copy(std_RR)[:l,k:]
-    # k = 153
-    # l = 153
-    # value_MC = np.copy(value_MC)[8:l,:k]
-    # value_RR = np.copy(value_RR)[:l,:k]
-    # std_MC = np.copy(std_MC)[:l,:k]
-    # std_RR = np.copy(std_RR)[:l,:k]
 
     # Calculate quantities
     rel_diff = (value_RR - value_MC) / value_MC
     rel_diff_unc = np.sqrt((std_RR/value_MC**2)**2 +
                            (std_MC * value_RR/value_MC**2) ** 2)
 
-    # calculate statistics
-
-    # deal with nans in the original arrays
-    rel_diff = np.copy(np.where(np.isnan(value_MC), 0, rel_diff))
-    rel_diff_unc = np.copy(np.where(np.isnan(value_MC), 0, rel_diff_unc))
-
-    # in a fuel assembly, areas with 0 fission rate cause a divide by zero error in the relative difference. This isn't an issue for plotting, but for the max error
-    rel_diff_for_max = np.where(value_MC < 1e-16, 0, rel_diff)
-    max_error = np.max(rel_diff_for_max)
-
-    min_error = np.min(rel_diff_for_max)
-    max_abs_err = np.max(np.abs([max_error, min_error]))
-
-    rmse = rmsError(value_MC, value_RR, relative_to='max_value')
-    meanErr = meanError(value_MC, value_RR)
-    # max_error = np.max(np.abs(rel_diff))
-
-    # Turn NaNs back into 0s for plotting
-    rel_diff = np.where(np.isnan(rel_diff), 0, rel_diff)
-    rel_diff_unc = np.where(np.isnan(rel_diff_unc), 0, rel_diff_unc)
-
-    plot.rcParams['figure.constrained_layout.use'] = True
+    rmse = rmsError(value_MC, value_RR, relative_to=rmse_relative_to)
 
     if plotting:
         if orientation == 'horizontal':
-            # fig, (ax1, ax2) = plot.subplots(1,2)
-            fig, ax1 = plot.subplots()  # TEMP
+            fig, (ax1, ax2) = plot.subplots(1,2)
+            # fig, ax1 = plot.subplots()  # TEMP
         elif orientation == 'vertical':
             fig, (ax1, ax2) = plot.subplots(2, 1)
+        
+        
         # check dimension:
         if rel_diff.ndim < 2:
             # This is not 2D data, assume 1-dimensional.
@@ -1033,25 +987,44 @@ def plotSpatialTallyCompare_MCRR(outputFileMC, outputFileRR, tallyName_MC, tally
             ax2.set_xlim(left=0)
 
         else:  # 2D data
-            # val_plot = ax1.imshow(rel_diff, cmap='RdBu_r', vmax=max_abs_err, vmin=-max_abs_err, origin='lower', aspect=aspect_ratio)
-            # val_plot = ax1.imshow(rel_diff, cmap='jet', origin='lower', aspect=aspect_ratio)
-            val_plot = ax1.imshow(rel_diff, cmap='viridis',
-                                  origin='lower', aspect=aspect_ratio)
-            # val_plot = ax1.imshow(rel_diff, cmap='rainbow', origin='lower', aspect=aspect_ratio)
-            # val_plot = ax1.imshow(rel_diff, cmap='magma', origin='lower', aspect=aspect_ratio)
-
-            # uncertainty_plot = ax2.imshow(rel_diff_unc, cmap='Reds', origin='lower', aspect=aspect_ratio)
+            masked_val = np.ma.masked_where(value_MC < tol, rel_diff)
+            masked_std = np.ma.masked_where(value_MC < tol, rel_diff_unc)
+            
+            val_plot = ax1.imshow(masked_val * 100, cmap=cmap_colour,
+                                  origin='lower', aspect=aspect_ratio, vmax=vmax, vmin=vmin)
+            uncertainty_plot = ax2.imshow(masked_std, cmap='Reds', origin='lower', aspect=aspect_ratio)
+            
+            
             fig.colorbar(val_plot, ax=ax1).minorticks_on()
-            # fig.colorbar(uncertainty_plot, ax=ax2).minorticks_on()
+            fig.colorbar(uncertainty_plot, ax=ax2).minorticks_on()
 
-        # ax1.set_title('Value \nNormalised by the mean\n of {} values'.format(normalise_by_mean))
-        ax1.set_title('Fission rate')  # TEMP
-        # ax2.set_title('Standard deviation\n(relative uncertainty)')
+            ax1 = label_plot(annotate, masked_val, ax1,
+                         fontsize=fontsize, color=colour, dp=dp)
 
-        fig.suptitle('(RR -MC) / MC: relative difference in {}. \nMax error={:.3%}, min error={:.3%}, \nRMSE={:.3%}, mean error={:.3%} relative to max MC {}.\n$k_{{MC}}={:.5f}$, $k_{{RR}}={:.5f}$, diff={:.0f} pcm'.format(
-            tallyName_RR, max_error, min_error, rmse, meanErr, tallyName_MC, keff_MC, keff_RR, 1e5*(keff_RR-keff_MC)) + '\n' + quarter_label + '\n' + removed_edges_label)
+        ax1.set_title('Value \nNormalised by the mean\n of {} values'.format(normalise_by_mean))
+  
+        ax2.set_title('Standard deviation\n(relative uncertainty)')
 
-        plot.savefig(newpath + '/compare_MCRR' + tallyName_RR + '.svg')
+        fig.suptitle('(RR -MC) / MC: relative difference in {}. \nMax error={:.3%}, min error={:.3%}, \nRMSE={:.3%} relative to {}.\n$k_{{MC}}={:.5f}$, $k_{{RR}}={:.5f}$, diff={:.0f} pcm (std: {:.2f}pcm)'.format(
+            tallyName_RR, np.max(masked_val), np.min(masked_val), rmse, rmse_relative_to, keff_MC, keff_RR, keff_diff, keff_diff_unc) + '\n' + quarter_label + '\n' + removed_edges_label)
+
+        plot.savefig(newpath + '/compare_MCRR' + tallyName_RR + str(mgID_label) + '.svg')
+
+
+def checkSymmetry(value_MC, value_RR):
+    # check symmetry
+    print('MC value symmetry check:')
+    value_MC_flip = np.flip(value_MC, 0)
+    value_RR_flip = np.flip(value_RR, 0)
+    print(100*(value_MC_flip - value_MC_flip.T)/value_MC_flip)
+
+    print('RR value symmetry check:')
+    print(100*(value_RR_flip - value_RR_flip.T)/value_RR_flip)
+
+    print('MC symmetry check:')
+    print(np.allclose(value_MC_flip, value_MC_flip.T, rtol=5e-3, atol=0))
+    print('RR symmetry check:')
+    print(np.allclose(value_RR_flip, value_RR_flip.T, rtol=5e-3, atol=0))
 
 
 def plotSpatialTallyCompare_MCMC(outputFileMC1, outputFileMC2, tallyName_MC1, tallyName_MC2, normalise_by_mean='all', response_index_MC1=0, response_index_MC2=0, plotting=True, visualise_quarter=False, aspect_ratio=1, orientation='horizontal', sideByside=False, i=0, j=None, newpath='outputs'):
@@ -1497,6 +1470,25 @@ def findKeffRR(outputFileRR):
     keff = outputs.keff.keff[0]
     std = outputs.keff.keff[1]
     return keff, std
+
+def compareKeff_RRMC(outputFileRR: str, outputFileMC):
+    """Returns keff from SCONE output json, Scarabee output json, and calculates the difference in pcm, relative to SCONE
+
+    Args:
+        outputFileMC (str): _description_
+        scarab_text_log (str): _description_
+d
+    Returns:
+        _type_: _description_
+    """
+    keff_MC, keff_MC_std = findKeffMC(outputFileMC)
+    keff_RR, keff_RR_std = findKeffRR(outputFileRR)
+
+    # find uncertainty
+    keff_diff_unc = np.sqrt(keff_MC_std ** 2 + keff_RR_std ** 2 ) * 1e5
+
+    keff_diff = (keff_RR - keff_MC) * 1e5  # pcm
+    return keff_MC, keff_RR, keff_diff, keff_diff_unc
 
 
 def normalise(array, target):
